@@ -16,7 +16,7 @@
     seed: 1, rate: 3, keys: 50, zipf: 1.1, replicas: 1,
     cache: null, capacity: 10, ttl: 30, policy: 'lru', jitter: 0, coalesce: false,
     invalidate: 'none', dbWorkers: 4, dbTime: 0.8, dbQueueMax: 8,
-    cacheTime: 0.03, netTime: 0.02, writeRate: 0, slowThreshold: 1.5, travel: 0.3,
+    cacheTime: 0.03, netTime: 0.02, writeRate: 0, slowThreshold: 1.5, travel: 0.48,
     showKeys: false // dibuja debajo de cada caché la tabla de claves que guarda (rosa: al día · ámbar: precio viejo)
   };
   const TOPOLOGY = ['cache', 'replicas'];
@@ -254,7 +254,9 @@
     _fly(a, b, color, done, r = 5.5, dashed = false) {
       const gen = this.gen;
       const el = svgEl('circle', { r, fill: color, class: 'pk' + (dashed ? ' stale' : '') }, this.gPk);
-      this.clock.animate(this.o.travel, p => {
+      // el salto servicio ↔ caché externa es corto (está al lado): medio viaje
+      const short = this.redis && (a === this.redis || b === this.redis);
+      this.clock.animate(this.o.travel * (short ? 0.5 : 1), p => {
         const P = cubic(edge(a, b, this.v), edge(b, a, this.v), p, this.v);
         el.setAttribute('cx', P.x); el.setAttribute('cy', P.y);
       }, () => { el.remove(); if (gen === this.gen) done(); });

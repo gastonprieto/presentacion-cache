@@ -162,7 +162,7 @@
   /* ---------- 9. una caché externa ---------- */
 
   S.donde = slide => {
-    const sim = setupCache(slide, { cache: 'local', replicas: 3, rate: 6, capacity: 10, ttl: 60, invalidate: 'delete', showKeys: true });
+    const sim = setupCache(slide, { cache: 'local', replicas: 3, rate: 6, capacity: 10, ttl: 15, invalidate: 'delete', showKeys: true });
     seg(slide, 'where', v => { sim.set('cache', v); showModeIn(slide, v); });
     on(slide, '[data-act=write]', () => sim.writePrice(0, 0));
     return life(sim);
@@ -281,7 +281,7 @@
 
     const schedule = () => {
       if (timer) timer.cancel();
-      timer = playing ? clock.every(0.7, () => { if (i >= seq.length) { playing = false; label(); timer.cancel(); } else step(); }) : null;
+      timer = playing ? clock.every(1.1, () => { if (i >= seq.length) { playing = false; label(); timer.cancel(); } else step(); }) : null;
     };
     const label = () => { slide.querySelector('[data-act=play]').textContent = playing ? '⏸ Pausa' : i >= seq.length ? '↻ Otra vez' : '▶ Seguir'; };
 
@@ -331,10 +331,13 @@
     return svgEl('path', { class: 'link ' + (cls || ''), d: curve(edge(a, b, M), edge(b, a, M), M) }, layer);
   }
 
+  // Ritmo de las escenas manuales: todas las duraciones de viaje se multiplican por SLOW (más pausado)
+  const SLOW = 1.6;
+
   // Punto que viaja de a hacia b (con el reloj de la escena)
   function fly(clock, layer, a, b, M, color, done, r = 6, dur = 0.5) {
     const el = svgEl('circle', { r, fill: color, class: 'pk' }, layer);
-    clock.animate(dur, p => {
+    clock.animate(dur * SLOW, p => {
       const P = cubic(edge(a, b, M), edge(b, a, M), p, M);
       el.setAttribute('cx', P.x); el.setAttribute('cy', P.y);
     }, () => { el.remove(); done && done(); });
@@ -565,7 +568,7 @@
   function flyLine(clock, layer, a, b, color, dur, done, r = 5) {
     const A = mp(a.x, a.y), B = mp(b.x, b.y);
     const el = svgEl('circle', { r, fill: color, class: 'pk' }, layer);
-    clock.animate(dur, p => { el.setAttribute('cx', A.x + (B.x - A.x) * p); el.setAttribute('cy', A.y + (B.y - A.y) * p); },
+    clock.animate(dur * SLOW, p => { el.setAttribute('cx', A.x + (B.x - A.x) * p); el.setAttribute('cy', A.y + (B.y - A.y) * p); },
       () => { el.remove(); done && done(); });
   }
   const travel = ms => 0.25 + ms / 350; // duración animada (s) de un tramo según su latencia

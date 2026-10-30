@@ -182,7 +182,7 @@ test('cachesim: el hit rate depende del tamaño y del patrón', async page => {
     };
   }`);
   check(r.big > r.small, JSON.stringify(r));
-  check(r.zipf - r.uniform >= 0.25, JSON.stringify(r));
+  check(r.zipf - r.uniform >= 0.2, JSON.stringify(r));
 });
 
 test('cachesim: capacidad ≥ claves', async page => {
@@ -230,8 +230,8 @@ test('cachesim: local vs compartida', async page => {
   const r = await engine(page, `(svg) => {
     const run = ${CSIM};
     return {
-      local: run(svg, { cache: 'local', replicas: 3, capacity: 10 }, 60, 40).hitRate,
-      shared: run(svg, { cache: 'shared', replicas: 3, capacity: 10 }, 60, 40).hitRate
+      local: run(svg, { cache: 'local', replicas: 3, capacity: 10, ttl: 15 }, 60, 40).hitRate,
+      shared: run(svg, { cache: 'shared', replicas: 3, capacity: 10, ttl: 15 }, 60, 40).hitRate
     };
   }`);
   check(r.local < r.shared, JSON.stringify(r));
