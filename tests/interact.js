@@ -57,6 +57,95 @@ test('notas: todas las slides tienen pregunta', async page => {
   check(!r.filter(x => x !== null).length, `sin pregunta: ${r.filter(x => x !== null)}`);
 });
 
+/* ---------- motor CacheKit ---------- */
+
+// Corre una secuencia de claves sobre una Cache (en un miss, set) y devuelve los hits
+const RUNSEQ = `(seq, opts) => {
+  const c = new CacheKit.Cache(opts);
+  let t = 0;
+  for (const k of seq) { t++; if (!c.get(k, t)) c.set(k, k, t); }
+  return c.stats.hits;
+}`;
+const SCAN = 'ABC'.repeat(5) + 'DEFGHI' + 'ABC'.repeat(5);
+const SHIFT = 'ABCD'.repeat(5) + 'EFGH'.repeat(5);
+
+test('cache: hit y miss', async page => {
+  await open(page);
+  const r = await page.evaluate(() => {
+    const c = new CacheKit.Cache({ capacity: 2 });
+    const first = c.get('a', 0);
+    c.set('a', 1, 0);
+    const second = c.get('a', 1);
+    return { first, value: second && second.value, stats: c.stats };
+  });
+  check(r.first === null, `primer get=${JSON.stringify(r.first)}`);
+  check(r.value === 1, `value=${r.value}`);
+  check(r.stats.hits === 1 && r.stats.misses === 1, `stats=${JSON.stringify(r.stats)}`);
+});
+
+test('cache: scan le gana a LRU', async page => {
+  await open(page);
+  const r = await page.evaluate(`(() => { const run = ${RUNSEQ}; const seq = '${SCAN}'.split('');
+    return { lru: run(seq, { capacity: 4, policy: 'lru' }), lfu: run(seq, { capacity: 4, policy: 'lfu' }), fifo: run(seq, { capacity: 4, policy: 'fifo' }) }; })()`);
+  check(r.lru === 24 && r.lfu === 27 && r.fifo === 24, JSON.stringify(r));
+});
+
+test('cache: cambio de popularidad le gana a LFU', async page => {
+  await open(page);
+  const r = await page.evaluate(`(() => { const run = ${RUNSEQ}; const seq = '${SHIFT}'.split('');
+    return { lru: run(seq, { capacity: 4, policy: 'lru' }), lfu: run(seq, { capacity: 4, policy: 'lfu' }) }; })()`);
+  check(r.lru === 32 && r.lfu === 16, JSON.stringify(r));
+});
+
+test('cache: ttl vence', async page => {
+  await open(page);
+  const r = await page.evaluate(() => {
+    const c = new CacheKit.Cache({ capacity: 4, ttl: 10 });
+    c.set('a', 1, 0);
+    const at9 = !!c.get('a', 9), at10 = c.get('a', 10);
+    return { at9, at10, exp: c.stats.expirations };
+  });
+  check(r.at9 && r.at10 === null && r.exp === 1, JSON.stringify(r));
+});
+
+test('cache: ttl 0 nunca pega', async page => {
+  await open(page);
+  const hits = await page.evaluate(() => {
+    const c = new CacheKit.Cache({ capacity: 4, ttl: 0 });
+    for (let t = 0; t < 100; t++) if (!c.get('a', t)) c.set('a', 1, t);
+    return c.stats.hits;
+  });
+  check(hits === 0, `hits=${hits}`);
+});
+
+test('cache: jitter reparte vencimientos', async page => {
+  await open(page);
+  const alive = await page.evaluate(() => {
+    const c = new CacheKit.Cache({ capacity: 100, ttl: 10, jitter: 0.2, seed: 1 });
+    for (let k = 0; k < 50; k++) c.set(k, k, 0);
+    let n = 0;
+    for (let k = 0; k < 50; k++) if (c.get(k, 9)) n++;
+    return n;
+  });
+  check(alive >= 15 && alive <= 40, `vivas en t=9: ${alive}`);
+});
+
+test('cache: zipf concentra', async page => {
+  await open(page);
+  const r = await page.evaluate(() => {
+    const count = s => {
+      const pick = CacheKit.zipfPicker(50, s, CacheKit.rng(1)), n = new Array(50).fill(0);
+      for (let i = 0; i < 10000; i++) n[pick()]++;
+      return n;
+    };
+    const z = count(1.1), u = count(0);
+    return { top: z[0] / 10000, maxU: Math.max(...u) / 10000, inRange: z.reduce((a, b) => a + b, 0) === 10000 };
+  });
+  check(r.top > 0.15, `clave 0 con zipf: ${r.top}`);
+  check(r.maxU < 0.04, `máx uniforme: ${r.maxU}`);
+  check(r.inRange, 'sorteos fuera de rango');
+});
+
 /* ---------- runner ---------- */
 
 (async () => {
