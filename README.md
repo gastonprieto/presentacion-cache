@@ -2,6 +2,8 @@
 
 Presentación interactiva (reveal.js + simulaciones en SVG) sobre cómo hacer barata una operación cara: hit y miss, hit rate, algoritmos de reemplazo (LRU, LFU, FIFO, random), TTL, invalidación, caché fría y estampida, caché local o compartida, qué no cachear, caché HTTP (`max-age`, `ETag`, `private`/`public`/`no-store`), CDN (distribución, purga y nombres versionados) y precálculo (jobs, desnormalización, vistas materializadas y sumar al escribir).
 
+**Verla online:** https://gastonprieto.github.io/presentacion-cache/
+
 Es parte de la serie de arquitectura (load balancer, microservicios, proxy reverso, colas, eventos), pero se puede dar sola y en cualquier orden.
 
 Teclas: `→` avanzar · `S` notas del orador · `F` pantalla completa · `O` vista general · `-` / `+` velocidad de las simulaciones. En el celular se ve como documento vertical.
