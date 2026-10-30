@@ -17,10 +17,13 @@
     cache: null, capacity: 10, ttl: 30, policy: 'lru', jitter: 0, coalesce: false,
     invalidate: 'none', dbWorkers: 4, dbTime: 0.8, dbQueueMax: 8,
     cacheTime: 0.03, netTime: 0.02, writeRate: 0, slowThreshold: 1.5, travel: 0.48,
-    showKeys: false // dibuja debajo de cada caché la tabla de claves que guarda (rosa: al día · ámbar: precio viejo)
+    showKeys: false // dibuja debajo de cada caché la tabla de claves que guarda (rosa: al día · ámbar: precio viejo);
+                    // además, clic en la réplica (o en la caché externa) abre sus entradas con precio y vencimiento
   };
   const TOPOLOGY = ['cache', 'replicas'];
   const CACHE_CONF = ['capacity', 'policy', 'ttl', 'jitter'];
+  // Precio que guarda la DB para la clave k en su versión v (cada cambio lo sube $100)
+  const price = (k, v) => '$' + (1000 + ((k * 37) % 20) * 50 + v * 100).toLocaleString('es-AR');
 
   class CacheSim {
     constructor(svg, opts) {
@@ -322,11 +325,15 @@
       this.dbNode.qg = svgEl('g', {}, this.dbNode.g);
       // Tablas de claves: una por caché (debajo de cada réplica, o debajo de la caché externa)
       this.keyTables = [];
+      this.inspected = null;
+      this.inspector = null;
       if (o.showKeys && o.cache) {
         const hosts = o.cache === 'shared' ? [this.redis] : this.svcs;
-        hosts.forEach(n => {
+        hosts.forEach((n, i) => {
           const g = svgEl('g', { class: 'keytable', transform: `translate(${n.x},${n.y + n.hh + 6})` }, this.gNodes);
           this.keyTables.push({ g, n, sig: '' });
+          n.g.classList.add('clickable');
+          n.g.addEventListener('click', () => this.inspect(i));
         });
       }
 
@@ -354,6 +361,47 @@
       });
     }
 
+    // Abre (o cierra, si ya estaba abierta) la vista de las entradas de la caché i
+    inspect(i) {
+      this.inspected = this.inspected === i ? null : i;
+      this.keyTables.forEach((t, j) => t.n.g.classList.toggle('inspected', j === this.inspected));
+      if (this.inspector) { this.inspector.g.remove(); this.inspector = null; }
+      this._drawInspector();
+    }
+
+    _drawInspector() {
+      const i = this.inspected;
+      if (i === null) return;
+      const cache = this.caches[i], now = this.now, v = this.v;
+      const keys = cache.keys().filter(k => cache.peek(k).expiresAt > now).sort((a, b) => a - b);
+      const rows = keys.map(k => {
+        const e = cache.peek(k), left = e.expiresAt - now;
+        return { k, val: price(k, e.version), db: price(k, this.dbVersion[k]), stale: e.version < this.dbVersion[k],
+          left: Number.isFinite(left) ? `${Math.ceil(left)} s` : '∞' };
+      });
+      const sig = JSON.stringify(rows);
+      if (this.inspector && this.inspector.sig === sig) return;
+      if (this.inspector) this.inspector.g.remove();
+      const n = this.keyTables[i].n;
+      const name = this.o.cache === 'shared' ? 'Caché externa' : `Caché de ${this.o.replicas > 1 ? `Productos ${i + 1}` : 'Productos'}`;
+      const rh = v ? 13 : 19, w = v ? 250 : 310, top = v ? 30 : 34, h = top + Math.max(1, rows.length) * rh + 8;
+      const x = v ? (W - w) / 2 : 10, y = v ? 4 : 10;
+      const g = svgEl('g', { class: 'cinspect', transform: `translate(${x},${y})` }, this.gTop);
+      g.addEventListener('click', () => this.inspect(i));
+      svgEl('rect', { class: 'ci-box', width: w, height: h, rx: 8 }, g);
+      const col = v ? [10, 46, 112, 150] : [12, 58, 136, 186];
+      svgEl('text', { x: col[0], y: v ? 13 : 16, class: 'ci-title' }, g).textContent = `${name} · ${rows.length}/${this.o.capacity}`;
+      svgEl('text', { x: w - 10, y: v ? 13 : 16, class: 'ci-title', 'text-anchor': 'end' }, g).textContent = '✕';
+      const hd = svgEl('text', { y: top - 5, class: 'ci-head' }, g);
+      ['clave', 'precio', 'vence', ''].forEach((t, j) => { svgEl('tspan', { x: col[j] }, hd).textContent = t; });
+      if (!rows.length) svgEl('text', { x: col[0], y: top + rh - 6, class: 'ci-head' }, g).textContent = 'vacía';
+      rows.forEach((r, j) => {
+        const row = svgEl('text', { y: top + (j + 1) * rh - 6, class: 'ci-row' + (r.stale ? ' stale' : ''), 'data-key': r.k }, g);
+        [`#${r.k}`, r.val, r.left, r.stale ? `⚠ DB: ${r.db}` : ''].forEach((t, c) => { svgEl('tspan', { x: col[c] }, row).textContent = t; });
+      });
+      this.inspector = { g, sig, n };
+    }
+
     _frame() {
       const o = this.o;
       const w = this.window(5);
@@ -375,6 +423,7 @@
       });
       if (this.front) this.front.sub.textContent = 'round robin';
       this.keyTables.forEach((t, i) => this._drawKeys(t, this.caches[i]));
+      this._drawInspector();
       this.emit('tick', this.now);
     }
   }

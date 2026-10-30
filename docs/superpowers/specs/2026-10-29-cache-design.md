@@ -75,7 +75,7 @@ La parte de caché **arranca con una caché en memoria del propio proceso**, mue
 | 5 | Reemplazo · "Se llenó: ¿a quién saco?" | casilleros paso a paso | LRU/LFU/FIFO/random, dos patrones |
 | 6 | Expiración · "TTL: fresco o rápido" | precio viejo hasta que vence | slider TTL, cambiar precio |
 | 7 | Invalidación · "Al escribir, avisar a la caché" | con una sola instancia, el que escribe borra su copia | no avisar / borrar / actualizar |
-| 8 | Escalar · "Escalar horizontalmente: N cachés repetidas" | 1 instancia vs 3 réplicas, cada una con **su tabla de claves visible**; cambiar precio desde la réplica 1 deja `#0` viejo (ámbar) en las otras | 1 / 3 réplicas, cambiar precio |
+| 8 | Escalar · "Escalar horizontalmente: N cachés repetidas" | 1 instancia vs 3 réplicas, cada una con **su tabla de claves visible**; cambiar precio desde la réplica 1 deja `#0` viejo (ámbar) en las otras; clic en una réplica abre sus entradas (clave, precio, vence) para comparar precios | 1 / 3 réplicas, cambiar precio, clic en réplica |
 | 9 | Caché externa · "Sacar la caché del proceso" | en cada réplica vs externa compartida (una sola tabla); un borrado alcanza | local / externa, cambiar precio |
 | 10 | Caché fría · "Se vació la caché" | estampida al vaciarse o vencer todo junto | reiniciar; coalescing, jitter, precalentar |
 | 11 | Restricciones · "¿Qué cachear y qué no?" | dos columnas: conviene / no conviene (datos de usuario: sí, con la clave del usuario) | fragmentos |

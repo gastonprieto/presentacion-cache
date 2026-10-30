@@ -622,6 +622,53 @@ test('escena escalar: cada réplica muestra su propia tabla de caché', async pa
   check(r.stale > 0, `sin claves viejas marcadas: ${JSON.stringify(r.tables)}`);
 });
 
+test('escena escalar: clic en una réplica muestra sus entradas con precio', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.escalar, sec => {
+    const sim = sec._scene.sim, click = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    sec.querySelector('.seg[data-group=reps] [data-v="3"]').click();
+    sim.fastForward(20);
+    sim.writePrice(0, 0); sim.writePrice(0, 0); // si #0 vuelve a la réplica 1, entra con el precio nuevo
+    sim.fastForward(2);
+    const read = i => {
+      click(sim.svcs[i].g);
+      const box = sec.querySelector('svg.sim .cinspect');
+      if (!box) return null;
+      return {
+        title: box.querySelector('.ci-title').textContent,
+        rows: [...box.querySelectorAll('.ci-row')].map(row => ({ key: row.dataset.key, text: row.textContent, stale: row.classList.contains('stale') }))
+      };
+    };
+    const a = read(0), b = read(1), c = read(2);
+    click(sim.svcs[2].g); // otro clic en la misma la cierra
+    return { a, b, c, closed: !sec.querySelector('svg.sim .cinspect'), sel: sec.querySelectorAll('svg.sim .srv.inspected').length };
+  });
+  check(r.a && r.b && r.c, `sin inspector: ${JSON.stringify(r)}`);
+  check(/Productos 1/.test(r.a.title) && /Productos 2/.test(r.b.title), `títulos: ${r.a.title} · ${r.b.title}`);
+  check(r.a.rows.length > 0 && r.a.rows.every(x => /\$/.test(x.text)), `filas sin precio: ${JSON.stringify(r.a.rows)}`);
+  check(!r.a.rows.some(x => x.stale), `la réplica que escribió no debería tener viejos: ${JSON.stringify(r.a.rows)}`);
+  const old = [r.b, r.c].flatMap(t => t.rows).filter(x => x.key === '0');
+  check(old.length > 0 && old.every(x => x.stale), `#0 en las otras réplicas debería ser viejo: ${JSON.stringify(old)}`);
+  check(r.closed && r.sel === 0, `no se cerró: ${JSON.stringify({ closed: r.closed, sel: r.sel })}`);
+});
+
+test('escena donde: clic en la caché externa muestra sus entradas', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.donde, sec => {
+    const sim = sec._scene.sim, click = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    click(sim.svcs[1].g);
+    const local = !!sec.querySelector('svg.sim .cinspect');
+    sec.querySelector('.seg[data-group=where] [data-v=shared]').click();
+    sim.fastForward(10);
+    const closedOnSwitch = !sec.querySelector('svg.sim .cinspect');
+    click(sim.redis.g);
+    const box = sec.querySelector('svg.sim .cinspect');
+    return { local, closedOnSwitch, title: box && box.querySelector('.ci-title').textContent, rows: box ? box.querySelectorAll('.ci-row').length : 0 };
+  });
+  check(r.local && r.closedOnSwitch, JSON.stringify(r));
+  check(/externa/i.test(r.title) && r.rows > 0, JSON.stringify(r));
+});
+
 test('escena donde: la caché externa muestra una sola tabla', async page => {
   await open(page);
   const n = await evalScene(page, SL.donde, sec => {

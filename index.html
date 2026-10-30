@@ -280,6 +280,7 @@
   <div class="demo">
     <div class="stage">
       <svg class="sim"></svg>
+      <div class="hint top">👆 Clic en una réplica para ver su caché</div>
       <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
     </div>
     <div class="panel">
@@ -299,7 +300,7 @@
   </div>
   <aside class="notes">
     Con 1 instancia el hit rate se estabiliza rápido. Pasar a 3 réplicas: cada una arranca vacía y tiene que hacer sus propios misses para el mismo producto; el hit rate baja y la DB recibe más consultas. La memoria total usada se triplica para guardar lo mismo.
-    Cambiar el precio: la escritura llega a una sola réplica (la 1), que borra su copia. Las otras dos no se enteran y siguen respondiendo el precio viejo (ámbar) hasta que les venza el TTL. Lo que en la slide anterior era fácil, con N copias se rompe.
+    Cambiar el precio: la escritura llega a una sola réplica (la 1), que borra su copia. Las otras dos no se enteran y siguen respondiendo el precio viejo (ámbar) hasta que les venza el TTL. Hacer clic en la réplica 1 y después en la 2: se ven sus entradas con precio y vencimiento, y el mismo producto tiene precios distintos. Lo que en la slide anterior era fácil, con N copias se rompe.
     Además: cada deploy o reinicio de una réplica vacía su caché.
     Pregunta para la clase: ¿cómo harían para que la réplica que cambia el precio le avise a las otras dos? ¿y si fueran 20?
   </aside>
@@ -312,6 +313,7 @@
   <div class="demo">
     <div class="stage">
       <svg class="sim"></svg>
+      <div class="hint top">👆 Clic en una caché para ver sus entradas</div>
       <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
     </div>
     <div class="panel">

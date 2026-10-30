@@ -483,3 +483,17 @@ html.mobile .netsim .kchip text { font-size: 7px; }
 .httpc .ctable .ct-row.own-beto { fill: #a3e635; }
 .cc-label { margin: 2px 0 -4px; font-size: 13px; color: var(--muted); }
 html.mobile .httpc .ctable .ct-title, html.mobile .httpc .ctable .ct-row { font-size: 9px; }
+
+/* Inspector de una caché: clic en la réplica (o en la caché externa) */
+.netsim .clickable { cursor: pointer; }
+.netsim .inspected .node-box { stroke: #f472b6; stroke-width: 3.5; }
+.netsim .cinspect { cursor: pointer; }
+.netsim .cinspect .ci-box { fill: #0b1020f2; stroke: #f472b6; stroke-width: 1.5; }
+.netsim .cinspect .ci-title { fill: #fbcfe8; font: 700 13px var(--sans); }
+.netsim .cinspect .ci-head { fill: #7c8bb5; font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: .04em; }
+.netsim .cinspect .ci-row { fill: #e2e8f0; font: 600 12px var(--mono); }
+.netsim .cinspect .ci-row.stale { fill: #fbbf24; }
+html.mobile .netsim .cinspect .ci-title { font-size: 10px; }
+html.mobile .netsim .cinspect .ci-head { font-size: 8px; }
+html.mobile .netsim .cinspect .ci-row { font-size: 9px; }
+.stage .hint.top { top: 12px; right: 14px; left: auto; bottom: auto; }

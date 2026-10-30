@@ -31,7 +31,7 @@ Presentación interactiva en español (reveal.js + GSAP + Chart.js) sobre cómo 
 
 **Caché** (`js/cache.js`, `window.CacheKit`): modelo puro `Cache` (capacidad, TTL con jitter, políticas lru/lfu/fifo/random; LFU desempata por recencia), `rng` sembrado y `zipfPicker`. Lo prueban `tests/interact.js` sin dibujar.
 
-**CacheSim** (`js/cachesim.js`, `window.CacheSimKit`): Usuarios → (Reparto) → Productos ×1..3 → Redis compartido o caché local por réplica → DB (workers + cola; llena → 503). `set(clave, valor)` cambia opciones en vivo (topología → reset; capacidad/política/TTL/jitter → caché nueva), `writePrice(key, replica)` sube la versión en la DB e invalida según `invalidate`, `flushCache`, `prewarm`, `fastForward`, `window(sec)` → hitRate, stale, dbReqs, p50/p95, err. Una respuesta es vieja si la versión cacheada es menor que la de la DB.
+**CacheSim** (`js/cachesim.js`, `window.CacheSimKit`): Usuarios → (Reparto) → Productos ×1..3 → Redis compartido o caché local por réplica → DB (workers + cola; llena → 503). `set(clave, valor)` cambia opciones en vivo (topología → reset; capacidad/política/TTL/jitter → caché nueva), `writePrice(key, replica)` sube la versión en la DB e invalida según `invalidate`, `inspect(i)` abre/cierra la vista de entradas de la caché i (clic en la réplica o en la caché externa cuando `showKeys`; muestra precio, vencimiento y ⚠ si la DB tiene otro precio), `flushCache`, `prewarm`, `fastForward`, `window(sec)` → hitRate, stale, dbReqs, p50/p95, err. Una respuesta es vieja si la versión cacheada es menor que la de la DB.
 
 **Escenas manuales** (reemplazo, HTTP, CDN, precálculo): exponen `ff(sec)` y `state()` en `section._scene` para las pruebas (`main.js` guarda la instancia en `slide._scene`).
 
