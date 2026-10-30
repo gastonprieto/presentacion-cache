@@ -480,6 +480,62 @@ test('escena privada: public filtra, private no', async page => {
   check(r.priv === 0 && r.nostore === 0, JSON.stringify(r));
 });
 
+/* ---------- escenas: CDN ---------- */
+
+Object.assign(SL, { cdn: 14, distribuir: 15 });
+
+test('escena cdn: con CDN baja la latencia y la carga del origen', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.cdn, sec => {
+    const sc = sec._scene;
+    sc.setCdn(false); sc.ff(10);
+    const off = sc.state();
+    sc.setCdn(true); sc.ff(10);
+    const on = sc.state();
+    return { off, on };
+  });
+  check(r.on.byRegion.oc.avgMs < r.off.byRegion.oc.avgMs / 2, `oc: ${r.off.byRegion.oc.avgMs} → ${r.on.byRegion.oc.avgMs}`);
+  check(r.on.originReqs <= 5 + r.on.total * 0.1, `origen=${r.on.originReqs} de ${r.on.total}`);
+  check(r.off.originReqs === r.off.total, `sin CDN todo al origen: ${r.off.originReqs}/${r.off.total}`);
+});
+
+test('escena distribuir: purga mezcla versiones, versionado no', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.distribuir, sec => {
+    const sc = sec._scene;
+    sec.querySelector('.seg[data-group=strategy] [data-v=purga]').click();
+    sc.ff(3);
+    sec.querySelector('[data-act=deploy]').click();
+    let mixed = false;
+    for (let i = 0; i < 40; i++) { sc.ff(0.25); const st = sc.state(); if (st.served.v1 > 0 && st.served.v2 > 0) mixed = true; }
+    sec.querySelector('.seg[data-group=strategy] [data-v=versionado]').click();
+    sc.ff(3);
+    sec.querySelector('[data-act=deploy]').click();
+    sc.ff(1);
+    const v1a = sc.state().served.v1;
+    sc.ff(8);
+    const st = sc.state();
+    return { mixed, v1a, v1b: st.served.v1, v2: st.served.v2 };
+  });
+  check(r.mixed, 'con purga nunca hubo mezcla de versiones');
+  check(r.v1a === r.v1b && r.v2 > 0, JSON.stringify(r));
+});
+
+test('cdn: reset a mitad del deploy', async (page, errors) => {
+  await open(page);
+  const st = await evalScene(page, SL.distribuir, sec => {
+    const sc = sec._scene;
+    sec.querySelector('.seg[data-group=strategy] [data-v=purga]').click();
+    sec.querySelector('[data-act=deploy]').click();
+    sc.ff(0.5);
+    sec.querySelector('.seg[data-group=strategy] [data-v=versionado]').click();
+    sc.ff(6);
+    return sc.state();
+  });
+  check(st.purgedEdges === 0, JSON.stringify(st));
+  check(errors.length === 0, errors.join(' | '));
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

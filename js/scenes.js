@@ -511,5 +511,206 @@
     return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ leaks, origin }) };
   };
 
+  /* ---------- 14–15. CDN: mapa estilizado ---------- */
+
+  const REGIONS = [
+    { id: 'na', name: 'Nueva York', x: 245, y: 200 },
+    { id: 'sa', name: 'Buenos Aires', x: 300, y: 450 },
+    { id: 'eu', name: 'Madrid', x: 455, y: 185 },
+    { id: 'as', name: 'Tokio', x: 790, y: 210 },
+    { id: 'oc', name: 'Sídney', x: 805, y: 465 }
+  ];
+  const ORIGIN = { x: 175, y: 255 };
+  const CONTINENTS = [[215, 200, 125, 85], [305, 420, 55, 105], [480, 175, 60, 45], [490, 345, 70, 100], [690, 200, 150, 85], [800, 450, 70, 45]];
+  // Celular: el mismo mapa escalado al lienzo de 400×440
+  const mp = (x, y) => (NetKit.MOBILE ? { x: 8 + x * 0.42, y: 40 + y * 0.62 } : { x, y });
+  const msBetween = (a, b) => Math.round(15 + Math.hypot(a.x - b.x, a.y - b.y) * 0.45); // en coordenadas de escritorio
+
+  function drawMap(svg) {
+    const g = svgEl('g', { class: 'map' }, svg);
+    CONTINENTS.forEach(([x, y, rx, ry]) => {
+      const P = mp(x, y), k = NetKit.MOBILE ? 0.42 : 1, ky = NetKit.MOBILE ? 0.62 : 1;
+      svgEl('ellipse', { cx: P.x, cy: P.y, rx: rx * k, ry: ry * ky }, g);
+    });
+  }
+
+  // Punto que viaja en línea recta entre dos posiciones de escritorio (se escalan en celular)
+  function flyLine(clock, layer, a, b, color, dur, done, r = 5) {
+    const A = mp(a.x, a.y), B = mp(b.x, b.y);
+    const el = svgEl('circle', { r, fill: color, class: 'pk' }, layer);
+    clock.animate(dur, p => { el.setAttribute('cx', A.x + (B.x - A.x) * p); el.setAttribute('cy', A.y + (B.y - A.y) * p); },
+      () => { el.remove(); done && done(); });
+  }
+  const travel = ms => 0.25 + ms / 350; // duración animada (s) de un tramo según su latencia
+
+  function cdnBase(slide) {
+    const m = manual(slide, 'cdnmap');
+    drawMap(m.svg);
+    const gl = svgEl('g', {}, m.svg), gn = svgEl('g', {}, m.svg), gp = svgEl('g', {}, m.svg);
+    const O = mp(ORIGIN.x, ORIGIN.y);
+    const og = svgEl('g', { class: 'origin', transform: `translate(${O.x},${O.y})` }, gn);
+    svgEl('rect', { x: -14, y: -14, width: 28, height: 28, rx: 6 }, og);
+    svgEl('text', { x: 0, y: 34, 'text-anchor': 'middle', class: 't-sub' }, og).textContent = 'origen';
+    const regions = REGIONS.map(r => {
+      const edgeAt = { x: r.x + (r.x > 600 ? -34 : 34), y: r.y - 26 };
+      const P = mp(r.x, r.y), E = mp(edgeAt.x, edgeAt.y);
+      const ug = svgEl('g', { class: 'user', transform: `translate(${P.x},${P.y})` }, gn);
+      svgEl('circle', { r: NetKit.MOBILE ? 6 : 9 }, ug);
+      svgEl('text', { x: 0, y: NetKit.MOBILE ? 18 : 26, 'text-anchor': 'middle', class: 't-sub' }, ug).textContent = r.name;
+      const eg = svgEl('g', { class: 'edge-node', transform: `translate(${E.x},${E.y})` }, gn);
+      svgEl('rect', { x: -9, y: -9, width: 18, height: 18, rx: 4 }, eg);
+      const elabel = svgEl('text', { x: 0, y: -14, 'text-anchor': 'middle', class: 'edge-label' }, eg);
+      return Object.assign({}, r, { edgeAt, eg, elabel });
+    });
+    return Object.assign(m, { gl, gn, gp, regions });
+  }
+
+  /* ---------- 14. CDN: llevar el contenido cerca ---------- */
+
+  S.cdn = slide => {
+    const { svg, clock, gp, regions } = cdnBase(slide);
+    const rand = CacheKit.rng(3);
+    let cdn = false, focus = false, cached, stats, originReqs, total;
+    const bars = slide.querySelector('.region-bars');
+    bars.innerHTML = regions.map(r => `<div class="rb" data-r="${r.id}"><span>${r.name}</span><i><b></b></i><em>—</em></div>`).join('');
+    const upd = hstats(slide, [['total', 'Pedidos'], ['originReqs', 'Al origen']]);
+    const resetStats = () => {
+      cached = {}; originReqs = 0; total = 0;
+      stats = Object.fromEntries(regions.map(r => [r.id, { n: 0, sum: 0 }]));
+    };
+    const draw = () => {
+      regions.forEach(r => {
+        r.eg.classList.toggle('on', cdn);
+        r.eg.classList.toggle('warm', cdn && !!cached[r.id]);
+        r.elabel.textContent = cdn ? (cached[r.id] ? '✓' : 'vacío') : '';
+        const st = stats[r.id], avg = st.n ? st.sum / st.n : null;
+        const row = bars.querySelector(`[data-r=${r.id}]`);
+        row.querySelector('b').style.width = avg ? `${Math.min(100, avg / 3.2)}%` : '0';
+        row.querySelector('b').className = avg == null ? '' : avg < 80 ? 'fast' : avg < 180 ? 'mid' : 'slow';
+        row.querySelector('em').textContent = avg ? `${Math.round(avg)} ms` : '—';
+      });
+      upd({ total, originReqs });
+    };
+    const request = r => {
+      total++;
+      const done = ms => { stats[r.id].n++; stats[r.id].sum += ms; draw(); };
+      if (!cdn) {
+        const ms = msBetween(r, ORIGIN);
+        originReqs++;
+        flyLine(clock, gp, r, ORIGIN, REQ, travel(ms) / 2, () => flyLine(clock, gp, ORIGIN, r, GREEN, travel(ms) / 2, () => done(ms), 6));
+        return;
+      }
+      const e = r.edgeAt, toEdge = msBetween(r, e);
+      if (cached[r.id]) {
+        flyLine(clock, gp, r, e, REQ, travel(toEdge) / 2, () => flyLine(clock, gp, e, r, PINK, travel(toEdge) / 2, () => done(toEdge), 6));
+        return;
+      }
+      const toOrigin = msBetween(e, ORIGIN);
+      originReqs++;
+      cached[r.id] = 'pending';
+      flyLine(clock, gp, r, e, REQ, travel(toEdge) / 2, () =>
+        flyLine(clock, gp, e, ORIGIN, REQ, travel(toOrigin) / 2, () =>
+          flyLine(clock, gp, ORIGIN, e, GREEN, travel(toOrigin) / 2, () => {
+            cached[r.id] = true;
+            flyLine(clock, gp, e, r, GREEN, travel(toEdge) / 2, () => done(toEdge + toOrigin), 6);
+          }, 6)));
+    };
+    const schedule = () => regions.forEach(r => {
+      const tick = () => {
+        if (!focus || r.id === 'oc') request(r);
+        clock.after(focus ? 0.5 + rand() * 0.4 : 0.9 + rand() * 0.8, tick);
+      };
+      clock.after(rand() * 1.2, tick);
+    });
+    const restart = () => { clock.clear(); gp.innerHTML = ''; resetStats(); schedule(); draw(); };
+    const setCdn = v => {
+      cdn = v;
+      slide.querySelector('[data-act=cdn]').textContent = cdn ? '⏻ Apagar CDN' : '🌐 Prender CDN';
+      restart();
+    };
+    on(slide, '[data-act=cdn]', () => setCdn(!cdn));
+    on(slide, '[data-act=focus]', b => { focus = !focus; b.textContent = focus ? 'Todas las regiones' : 'Sólo desde Sídney'; restart(); });
+    restart();
+    return {
+      start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), setCdn,
+      state: () => ({
+        originReqs, total,
+        byRegion: Object.fromEntries(regions.map(r => [r.id, { n: stats[r.id].n, avgMs: stats[r.id].n ? stats[r.id].sum / stats[r.id].n : null }]))
+      })
+    };
+  };
+
+  /* ---------- 15. distribuir e invalidar ---------- */
+
+  S.distribuir = slide => {
+    const { svg, clock, gp, regions } = cdnBase(slide);
+    const rand = CacheKit.rng(5);
+    const VCOL = { 1: '#94a3b8', 2: '#fb923c' };
+    const NAME = { 1: 'app.3f2a.js', 2: 'app.9c1e.js' };
+    let strategy = 'purga', originV, edgeV, served, purgedEdges, deployed, gen = 0;
+    const upd = hstats(slide, [['v1', 'Sirvieron v1'], ['v2', 'Sirvieron v2'], ['purged', 'Bordes purgados']]);
+    const draw = () => {
+      regions.forEach(r => {
+        const v = edgeV[r.id];
+        r.elabel.textContent = v ? (strategy === 'purga' ? `app.js v${v}` : NAME[v]) : 'vacío';
+        r.eg.classList.add('on');
+        r.eg.style.setProperty('--v', v ? VCOL[v] : '#475569');
+      });
+      upd({ v1: served.v1, v2: served.v2, purged: strategy === 'purga' ? `${purgedEdges}/${regions.length}` : '—' });
+    };
+    const request = r => {
+      const e = r.edgeAt, want = originV; // con versionado, el HTML (sin caché) ya apunta al nombre nuevo
+      const v = strategy === 'purga' ? edgeV[r.id] : edgeV[r.id] === want ? want : null;
+      if (v) {
+        flyLine(clock, gp, r, e, REQ, 0.3, () => flyLine(clock, gp, e, r, VCOL[v], 0.3, () => { if (deployed) served[`v${v}`]++; draw(); }, 6));
+        return;
+      }
+      flyLine(clock, gp, r, e, REQ, 0.3, () => flyLine(clock, gp, e, ORIGIN, REQ, 0.6, () => {
+        const got = originV;
+        flyLine(clock, gp, ORIGIN, e, VCOL[got], 0.6, () => {
+          edgeV[r.id] = got;
+          flyLine(clock, gp, e, r, VCOL[got], 0.3, () => { if (deployed) served[`v${got}`]++; draw(); }, 6);
+        }, 6);
+      }));
+    };
+    const restart = () => {
+      gen++;
+      clock.clear(); gp.innerHTML = '';
+      originV = 1; deployed = false; purgedEdges = 0;
+      served = { v1: 0, v2: 0 };
+      edgeV = Object.fromEntries(regions.map(r => [r.id, 1]));
+      regions.forEach(r => {
+        const tick = () => { request(r); clock.after(0.8 + rand() * 0.6, tick); };
+        clock.after(rand(), tick);
+      });
+      draw();
+    };
+    const deploy = () => {
+      if (deployed) restart();
+      const g = gen;
+      originV = 2; deployed = true;
+      pop(gp, mp(ORIGIN.x, ORIGIN.y).x, mp(ORIGIN.x, ORIGIN.y).y - 22, 'v2 publicada', VCOL[2]);
+      if (strategy !== 'purga') { draw(); return; }
+      regions.forEach(r => {
+        const delay = 0.6 + rand() * 4;
+        flyLine(clock, gp, ORIGIN, r.edgeAt, RED, delay, () => {
+          if (g !== gen) return;
+          edgeV[r.id] = null; purgedEdges++;
+          const E = mp(r.edgeAt.x, r.edgeAt.y);
+          pop(gp, E.x, E.y - 18, 'purgado', RED);
+          draw();
+        }, 4);
+      });
+      draw();
+    };
+    seg(slide, 'strategy', v => { strategy = v; showModeIn(slide, v); restart(); });
+    on(slide, '[data-act=deploy]', deploy);
+    restart();
+    return {
+      start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec),
+      state: () => ({ mode: strategy, served: Object.assign({}, served), purgedEdges })
+    };
+  };
+
   window.Scenes = S;
 })();

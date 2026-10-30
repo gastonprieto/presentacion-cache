@@ -413,3 +413,19 @@ b.amber { color: #d97706; }
 .btn.ana { border-color: #38bdf8; }
 .btn.beto { border-color: #a3e635; }
 html.mobile .httpc .hdr { font-size: 11px; }
+
+/* ---------- CDN ---------- */
+.cdnmap .map ellipse { fill: #94a3b8; opacity: .08; }
+.cdnmap .origin rect { fill: #0e2338; stroke: var(--cyan); stroke-width: 2.5; }
+.cdnmap .user circle { fill: #7dd3fc; opacity: .9; }
+.cdnmap .edge-node rect { fill: none; stroke: none; }
+.cdnmap .edge-node.on rect { fill: #1a0f1c; stroke: var(--v, #f472b6); stroke-width: 2; }
+.cdnmap .edge-node.warm rect { fill: #4a1838; stroke: #f472b6; }
+.cdnmap .edge-label { fill: #f9a8d4; font: 600 11px var(--mono); }
+.region-bars { display: grid; gap: 4px; font-size: 13px; }
+.rb { display: grid; grid-template-columns: 96px 1fr 62px; align-items: center; gap: 8px; color: #cbd5e1; }
+.rb i { height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden; }
+.rb b { display: block; height: 100%; width: 0; border-radius: 5px; transition: width .3s; }
+.rb b.fast { background: var(--green); } .rb b.mid { background: var(--yellow); } .rb b.slow { background: var(--red); }
+.rb em { font: 600 13px var(--mono); font-style: normal; text-align: right; }
+html.mobile .cdnmap .edge-label { font-size: 8px; }

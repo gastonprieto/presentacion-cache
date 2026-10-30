@@ -443,6 +443,65 @@
   </aside>
 </section>
 
+<!-- ============ 14. CDN ============ -->
+<section data-scene="cdn">
+  <div class="kicker pink">CDN</div>
+  <h2>Llevar el contenido cerca</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#7dd3fc"></i>pedido</span><span><i style="background:#4ade80"></i>desde el origen</span><span><i style="background:#f472b6"></i>desde el borde</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">La tienda está en <b>Nueva York</b>. Un pedido desde Sídney cruza medio mundo: <b>la distancia es latencia</b>, y ninguna caché local lo arregla.</p>
+      <div class="actions">
+        <button class="btn primary" data-act="cdn">🌐 Prender CDN</button>
+        <button class="btn" data-act="focus">Sólo desde Sídney</button>
+      </div>
+      <div class="region-bars"></div>
+      <div class="hstats"></div>
+      <ul class="points">
+        <li class="fragment">Una CDN tiene <b>copias en muchos puntos</b> del mundo (bordes).</li>
+        <li class="fragment">El primer pedido de cada región va al origen; los siguientes, <b>al borde</b>.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Sin CDN, cada usuario va hasta el origen en Nueva York: ~40 ms desde Nueva York, ~300 ms desde Sídney, por pedido y por cada archivo de la página. No es un problema de la DB ni del servidor: es la velocidad de la luz en la fibra.
+    Prender la CDN: aparecen nodos de borde (puntos de presencia) cerca de cada región. El primer pedido de cada región es un miss y va al origen; después se responde en el borde. Las barras de latencia se achican y el origen casi no recibe pedidos.
+    "Sólo desde Sídney" con la CDN recién prendida muestra el calentamiento de una región.
+    Es una caché HTTP compartida (public), distribuida geográficamente: respeta los mismos headers que vimos (max-age, ETag).
+    Pregunta para la clase: ¿qué partes de la tienda pondrían en la CDN y cuáles no?
+  </aside>
+</section>
+
+<!-- ============ 15. DISTRIBUIR E INVALIDAR ============ -->
+<section data-scene="distribuir">
+  <div class="kicker pink">Distribuir</div>
+  <h2>Distribuir e invalidar</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#94a3b8"></i>v1</span><span><i style="background:#fb923c"></i>v2</span><span><i style="background:#f87171"></i>purga</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Publicamos un <code>app.js</code> nuevo. Los bordes tienen <b>copias del viejo</b>. ¿Cómo se enteran?</p>
+      <div class="seg" data-group="strategy">
+        <button data-v="purga" class="active">Purgar</button><button data-v="versionado">Nombre versionado</button>
+      </div>
+      <p class="mode-text" data-mode="purga">Se le pide a la CDN que borre <code>app.js</code> en <b>todos los bordes</b>. Llega a cada uno en distinto momento: mientras tanto, unos sirven v1 y otros v2.</p>
+      <p class="mode-text" data-mode="versionado" hidden>Cada versión tiene <b>otro nombre</b> (<code>app.3f2a.js</code> → <code>app.9c1e.js</code>) y <code>max-age</code> de un año. El HTML (no cacheado) apunta al nuevo: <b>no hay nada que invalidar</b>.</p>
+      <div class="actions"><button class="btn primary" data-act="deploy">🚀 Publicar versión nueva</button></div>
+      <div class="hstats"></div>
+    </div>
+  </div>
+  <aside class="notes">
+    Purgar: se ve la orden de borrado viajar a cada borde con demoras distintas. Durante esos segundos (en la vida real pueden ser minutos) hay usuarios con v1 y usuarios con v2: si el HTML nuevo espera el JS nuevo, se rompe.
+    Nombre versionado (fingerprinting): el nombre del archivo incluye una huella de su contenido. Un archivo con nombre nunca cambia, así que se cachea "para siempre". Publicar es cambiar a qué nombre apunta el HTML, que se sirve sin caché (o con max-age muy corto). Los bundlers (Vite, webpack) lo hacen solos.
+    Pregunta para la clase: si el nombre del archivo cambia en cada versión, ¿qué pasa con las copias viejas en los bordes?
+  </aside>
+</section>
+
 <!-- ============ 20. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>
