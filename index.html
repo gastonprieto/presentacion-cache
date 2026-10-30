@@ -382,13 +382,12 @@
         <li class="fragment"><b>Stock al pagar, saldos</b>: necesitan el valor real ahora; uno viejo vende lo que no hay.</li>
         <li class="fragment"><b>Lo que se escribe más de lo que se lee</b>: se invalida antes de reutilizarse.</li>
         <li class="fragment"><b>Lo que no entra</b>: si casi todo es distinto, el hit rate es bajo y sólo suma memoria.</li>
-        <li class="fragment"><b>Datos de un usuario con una clave que no lo incluye</b>: en una caché HTTP compartida la clave es la URL, y <code>/perfil</code> es igual para todos.</li>
       </ul>
     </div>
   </div>
   <aside class="notes">
     Regla general: conviene cachear lo que se lee mucho más de lo que se escribe y tolera estar un poco desactualizado. Si una de las dos no se cumple, pensarlo dos veces.
-    Los datos de un usuario aparecen en las dos columnas a propósito: no es el dato, es la clave. Con la clave perfil:ana está bien; con una clave que no identifica al usuario (por ejemplo, sólo la URL en un proxy compartido), Beto ve el perfil de Ana. Lo vamos a ver en vivo con la caché HTTP.
+    Los datos de cada usuario se pueden cachear, siempre que la clave identifique al usuario (perfil:ana). Qué pasa cuando no la identifica lo vamos a ver en vivo con la caché HTTP.
     Pregunta para la clase: ¿el carrito de compras se puede cachear? ¿con qué clave?
   </aside>
 </section>

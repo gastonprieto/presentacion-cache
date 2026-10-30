@@ -138,7 +138,7 @@
   /* ---------- 8. escalar horizontalmente: N cachés en memoria ---------- */
 
   S.escalar = slide => {
-    const opts = replicas => ({ cache: 'local', replicas, rate: 6, capacity: 10, ttl: 30, invalidate: 'delete' });
+    const opts = replicas => ({ cache: 'local', replicas, rate: 6, capacity: 10, ttl: 30, invalidate: 'delete', showKeys: true });
     const sim = setupCache(slide, opts(1));
     seg(slide, 'reps', v => { sim.reset(opts(+v)); showModeIn(slide, v); });
     on(slide, '[data-act=write]', () => sim.writePrice(0, 0));
@@ -162,7 +162,7 @@
   /* ---------- 9. una caché externa ---------- */
 
   S.donde = slide => {
-    const sim = setupCache(slide, { cache: 'local', replicas: 3, rate: 6, capacity: 10, ttl: 60, invalidate: 'delete' });
+    const sim = setupCache(slide, { cache: 'local', replicas: 3, rate: 6, capacity: 10, ttl: 60, invalidate: 'delete', showKeys: true });
     seg(slide, 'where', v => { sim.set('cache', v); showModeIn(slide, v); });
     on(slide, '[data-act=write]', () => sim.writePrice(0, 0));
     return life(sim);

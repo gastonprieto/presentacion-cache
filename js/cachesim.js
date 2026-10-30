@@ -16,7 +16,8 @@
     seed: 1, rate: 3, keys: 50, zipf: 1.1, replicas: 1,
     cache: null, capacity: 10, ttl: 30, policy: 'lru', jitter: 0, coalesce: false,
     invalidate: 'none', dbWorkers: 4, dbTime: 0.8, dbQueueMax: 8,
-    cacheTime: 0.03, netTime: 0.02, writeRate: 0, slowThreshold: 1.5, travel: 0.3
+    cacheTime: 0.03, netTime: 0.02, writeRate: 0, slowThreshold: 1.5, travel: 0.3,
+    showKeys: false // dibuja debajo de cada caché la tabla de claves que guarda (rosa: al día · ámbar: precio viejo)
   };
   const TOPOLOGY = ['cache', 'replicas'];
   const CACHE_CONF = ['capacity', 'policy', 'ttl', 'jitter'];
@@ -314,6 +315,15 @@
       if (o.cache === 'shared') this.redis = v ? this._box('redis', 105, 340, 92, 30, 'Caché ext.', '⚡') : this._box('redis', 700, 150, 90, 36, 'Caché externa', '⚡');
       this.dbNode = v ? this._box('srv data', o.cache === 'shared' ? 295 : W / 2, 340, 92, 30, 'DB', '🗄') : this._box('srv data', 700, o.cache === 'shared' ? 430 : H / 2, 90, 36, 'DB', '🗄');
       this.dbNode.qg = svgEl('g', {}, this.dbNode.g);
+      // Tablas de claves: una por caché (debajo de cada réplica, o debajo de la caché externa)
+      this.keyTables = [];
+      if (o.showKeys && o.cache) {
+        const hosts = o.cache === 'shared' ? [this.redis] : this.svcs;
+        hosts.forEach(n => {
+          const g = svgEl('g', { class: 'keytable', transform: `translate(${n.x},${n.y + n.hh + 6})` }, this.gNodes);
+          this.keyTables.push({ g, n, sig: '' });
+        });
+      }
 
       this.svcs.forEach(s => {
         this._link(this.front || this.client, s);
@@ -321,6 +331,22 @@
         this._link(s, this.dbNode, 'db-link');
       });
       if (this.front) this._link(this.client, this.front);
+    }
+
+    _drawKeys(t, cache) {
+      const keys = cache.keys().filter(k => cache.peek(k).expiresAt > this.now).sort((a, b) => a - b);
+      const sig = keys.map(k => `${k}:${cache.peek(k).version < this.dbVersion[k] ? 1 : 0}`).join(',');
+      if (sig === t.sig) return;
+      t.sig = sig;
+      t.g.innerHTML = '';
+      const per = 5, cw = this.v ? 16 : 30, ch = this.v ? 12 : 15, gap = this.v ? 2 : 3;
+      const x0 = -(per * (cw + gap) - gap) / 2;
+      keys.slice(0, per * 2).forEach((k, j) => {
+        const stale = cache.peek(k).version < this.dbVersion[k];
+        const c = svgEl('g', { class: 'kchip' + (stale ? ' stale' : ''), transform: `translate(${x0 + (j % per) * (cw + gap)},${Math.floor(j / per) * (ch + gap)})` }, t.g);
+        svgEl('rect', { width: cw, height: ch, rx: 3 }, c);
+        svgEl('text', { x: cw / 2, y: ch - (this.v ? 3 : 4), 'text-anchor': 'middle' }, c).textContent = `#${k}`;
+      });
     }
 
     _frame() {
@@ -343,6 +369,7 @@
         } else s.sub.textContent = o.cache ? 'busca en la caché' : 'consulta la DB';
       });
       if (this.front) this.front.sub.textContent = 'round robin';
+      this.keyTables.forEach((t, i) => this._drawKeys(t, this.caches[i]));
       this.emit('tick', this.now);
     }
   }

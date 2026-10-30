@@ -606,6 +606,32 @@ test('escena escalar: N réplicas repiten la caché e invalidan sólo la propia'
   check(r.stale > 0, `stale=${r.stale}`);
 });
 
+test('escena escalar: cada réplica muestra su propia tabla de caché', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.escalar, sec => {
+    const sim = sec._scene.sim;
+    sec.querySelector('.seg[data-group=reps] [data-v="3"]').click();
+    sim.fastForward(20);
+    sec.querySelector('[data-act=write]').click();
+    sim.fastForward(3);
+    const tables = [...sec.querySelectorAll('svg.sim .keytable')].map(t => [...t.querySelectorAll('.kchip')].map(c => c.textContent + (c.classList.contains('stale') ? '*' : '')).join(' '));
+    return { tables, stale: sec.querySelectorAll('svg.sim .kchip.stale').length };
+  });
+  check(r.tables.length === 3, `tablas=${r.tables.length}`);
+  check(new Set(r.tables).size > 1, `las tablas son iguales: ${JSON.stringify(r.tables)}`);
+  check(r.stale > 0, `sin claves viejas marcadas: ${JSON.stringify(r.tables)}`);
+});
+
+test('escena donde: la caché externa muestra una sola tabla', async page => {
+  await open(page);
+  const n = await evalScene(page, SL.donde, sec => {
+    sec.querySelector('.seg[data-group=where] [data-v=shared]').click();
+    sec._scene.sim.fastForward(5);
+    return sec.querySelectorAll('svg.sim .keytable').length;
+  });
+  check(n === 1, `tablas=${n}`);
+});
+
 /* ---------- revisión final: estado en vuelo al cambiar de modo ---------- */
 
 test('privada: una respuesta en vuelo no cuenta en el modo nuevo', async page => {

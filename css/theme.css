@@ -471,3 +471,8 @@ html.mobile pre.sql { font-size: 11px; }
 .layer-card.bad { border-top: 4px solid var(--red); }
 .layer-card.good ul, .layer-card.bad ul { font-size: 19px; line-height: 1.5; }
 .layer-card.good li, .layer-card.bad li { margin-bottom: 8px; }
+.netsim .kchip rect { fill: #2a1020; stroke: #f472b6; stroke-width: 1.2; }
+.netsim .kchip text { fill: #fbcfe8; font: 700 10px var(--mono); }
+.netsim .kchip.stale rect { fill: #3a2408; stroke: #d97706; stroke-dasharray: 3 2; }
+.netsim .kchip.stale text { fill: #fbbf24; }
+html.mobile .netsim .kchip text { font-size: 7px; }
