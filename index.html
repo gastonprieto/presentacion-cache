@@ -497,7 +497,7 @@
       <div class="legend"><span><i style="background:#7dd3fc"></i>pedido</span><span><i style="background:#4ade80"></i>desde el origen</span><span><i style="background:#f472b6"></i>desde el borde</span></div>
     </div>
     <div class="panel">
-      <p class="lead">La tienda está en <b>Nueva York</b>. Un pedido desde Sídney cruza medio mundo: <b>la distancia es latencia</b>, y ninguna caché local lo arregla.</p>
+      <p class="lead">La tienda está en <b>Estados Unidos</b>. Un pedido desde Sídney cruza medio mundo: <b>la distancia es latencia</b>, y ninguna caché local lo arregla.</p>
       <div class="actions">
         <button class="btn primary" data-act="cdn">🌐 Prender CDN</button>
         <button class="btn" data-act="focus">Sólo desde Sídney</button>
@@ -511,7 +511,7 @@
     </div>
   </div>
   <aside class="notes">
-    Sin CDN, cada usuario va hasta el origen en Nueva York: ~70 ms desde Nueva York, ~300 ms desde Sídney, por pedido y por cada archivo de la página. No es un problema de la DB ni del servidor: es la velocidad de la luz en la fibra.
+    Sin CDN, cada usuario va hasta el origen en Estados Unidos (las líneas largas que convergen): ~60 ms desde Nueva York, ~300 ms desde Sídney. Cada respuesta muestra su latencia sobre el usuario, por pedido y por cada archivo de la página. No es un problema de la DB ni del servidor: es la velocidad de la luz en la fibra.
     Prender la CDN: aparecen nodos de borde (puntos de presencia) cerca de cada región. El primer pedido de cada región es un miss y va al origen; después se responde en el borde. Las barras de latencia se achican y el origen casi no recibe pedidos.
     "Sólo desde Sídney" con la CDN recién prendida muestra el calentamiento de una región.
     Es una caché HTTP compartida (public), distribuida geográficamente: respeta los mismos headers que vimos (max-age, ETag).

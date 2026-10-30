@@ -527,24 +527,37 @@
 
   /* ---------- 14–15. CDN: mapa estilizado ---------- */
 
+  // Proyección equirectangular simple sobre el lienzo de escritorio (900×590)
+  const proj = (lon, lat) => ({ x: 40 + (lon + 170) * 2.333, y: 90 + (80 - lat) * 3.48 });
   const REGIONS = [
-    { id: 'na', name: 'Nueva York', x: 245, y: 200 },
-    { id: 'sa', name: 'Buenos Aires', x: 300, y: 450 },
-    { id: 'eu', name: 'Madrid', x: 455, y: 185 },
-    { id: 'as', name: 'Tokio', x: 790, y: 210 },
-    { id: 'oc', name: 'Sídney', x: 805, y: 465 }
+    Object.assign({ id: 'na', name: 'Nueva York' }, proj(-74, 41)),
+    Object.assign({ id: 'sa', name: 'Buenos Aires' }, proj(-58, -35)),
+    Object.assign({ id: 'eu', name: 'Madrid' }, proj(-4, 40)),
+    Object.assign({ id: 'as', name: 'Tokio' }, proj(140, 36)),
+    Object.assign({ id: 'oc', name: 'Sídney' }, proj(151, -34))
   ];
-  const ORIGIN = { x: 165, y: 290 };
-  const CONTINENTS = [[215, 200, 125, 85], [305, 420, 55, 105], [480, 175, 60, 45], [490, 345, 70, 100], [690, 200, 150, 85], [800, 450, 70, 45]];
+  const ORIGIN = proj(-118, 22);
+  // Siluetas simplificadas de los continentes (lon, lat)
+  const CONTINENTS = [
+    [[-165, 65], [-140, 70], [-95, 72], [-75, 62], [-55, 52], [-66, 45], [-75, 35], [-81, 25], [-97, 26], [-97, 18], [-87, 15], [-80, 8], [-105, 20], [-117, 32], [-124, 40], [-125, 48], [-140, 58], [-165, 60]],
+    [[-55, 60], [-20, 70], [-22, 80], [-60, 80], [-70, 75]],
+    [[-80, 8], [-60, 10], [-50, 0], [-35, -5], [-40, -22], [-48, -28], [-58, -38], [-65, -55], [-75, -50], [-72, -30], [-70, -18], [-81, -5]],
+    [[-10, 36], [-9, 43], [-2, 44], [-5, 48], [2, 51], [8, 54], [5, 58], [10, 63], [20, 70], [30, 70], [40, 66], [40, 45], [28, 41], [20, 40], [12, 44], [10, 38], [0, 38]],
+    [[-17, 21], [-10, 30], [-5, 36], [10, 37], [30, 31], [33, 28], [43, 12], [51, 12], [40, -5], [40, -15], [35, -25], [20, -35], [15, -28], [12, -15], [9, 0], [-8, 5], [-17, 14]],
+    [[40, 45], [40, 66], [60, 70], [80, 73], [110, 77], [140, 72], [170, 68], [180, 65], [160, 58], [142, 50], [130, 42], [122, 40], [122, 30], [110, 20], [105, 10], [100, 13], [98, 8], [92, 22], [80, 8], [72, 20], [60, 25], [56, 25], [52, 17], [43, 12], [35, 30], [45, 40]],
+    [[130, 31], [135, 34], [141, 38], [142, 45], [140, 41], [133, 33]],
+    [[114, -22], [122, -17], [130, -12], [137, -12], [142, -11], [146, -19], [153, -26], [150, -37], [141, -38], [130, -32], [115, -34]]
+  ];
   // Celular: el mismo mapa escalado al lienzo de 400×440
-  const mp = (x, y) => (NetKit.MOBILE ? { x: 8 + x * 0.42, y: 40 + y * 0.62 } : { x, y });
+  const mp = (x, y) => (NetKit.MOBILE ? { x: 8 + x * 0.42, y: 20 + y * 0.66 } : { x, y });
   const msBetween = (a, b) => Math.round(15 + Math.hypot(a.x - b.x, a.y - b.y) * 0.45); // en coordenadas de escritorio
+  const msColor = ms => (ms < 80 ? C.ok : ms < 180 ? C.slow : C.err);
 
   function drawMap(svg) {
     const g = svgEl('g', { class: 'map' }, svg);
-    CONTINENTS.forEach(([x, y, rx, ry]) => {
-      const P = mp(x, y), k = NetKit.MOBILE ? 0.42 : 1, ky = NetKit.MOBILE ? 0.62 : 1;
-      svgEl('ellipse', { cx: P.x, cy: P.y, rx: rx * k, ry: ry * ky }, g);
+    CONTINENTS.forEach(poly => {
+      const pts = poly.map(([lon, lat]) => { const P0 = proj(lon, lat), P = mp(P0.x, P0.y); return `${P.x.toFixed(1)},${P.y.toFixed(1)}`; });
+      svgEl('polygon', { points: pts.join(' ') }, g);
     });
   }
 
@@ -560,29 +573,43 @@
   function cdnBase(slide) {
     const m = manual(slide, 'cdnmap');
     drawMap(m.svg);
+    const M = NetKit.MOBILE;
     const gl = svgEl('g', {}, m.svg), gn = svgEl('g', {}, m.svg), gp = svgEl('g', {}, m.svg);
     const O = mp(ORIGIN.x, ORIGIN.y);
-    const og = svgEl('g', { class: 'origin', transform: `translate(${O.x},${O.y})` }, gn);
-    svgEl('rect', { x: -14, y: -14, width: 28, height: 28, rx: 6 }, og);
-    svgEl('text', { x: 0, y: 34, 'text-anchor': 'middle', class: 't-sub' }, og).textContent = 'origen';
     const regions = REGIONS.map(r => {
-      const edgeAt = { x: r.x + (r.x > 600 ? -34 : 34), y: r.y - 26 };
+      const edgeAt = { x: r.x + (r.x > 600 ? -38 : 38), y: r.y - 30 };
       const P = mp(r.x, r.y), E = mp(edgeAt.x, edgeAt.y);
+      const toOrigin = svgEl('line', { class: 'route origin-route', x1: P.x, y1: P.y, x2: O.x, y2: O.y }, gl);
+      const toEdge = svgEl('line', { class: 'route edge-route', x1: P.x, y1: P.y, x2: E.x, y2: E.y }, gl);
+      const edgeOrigin = svgEl('line', { class: 'route back-route', x1: E.x, y1: E.y, x2: O.x, y2: O.y }, gl);
       const ug = svgEl('g', { class: 'user', transform: `translate(${P.x},${P.y})` }, gn);
-      svgEl('circle', { r: NetKit.MOBILE ? 6 : 9 }, ug);
-      svgEl('text', { x: 0, y: NetKit.MOBILE ? 18 : 26, 'text-anchor': 'middle', class: 't-sub' }, ug).textContent = r.name;
+      svgEl('circle', { r: M ? 7 : 11 }, ug);
+      svgEl('text', { x: 0, y: M ? 4 : 5, 'text-anchor': 'middle', class: 'user-ico' }, ug).textContent = '👤';
+      svgEl('text', { x: 0, y: M ? 20 : 28, 'text-anchor': 'middle', class: 'city' }, ug).textContent = r.name;
       const eg = svgEl('g', { class: 'edge-node', transform: `translate(${E.x},${E.y})` }, gn);
-      svgEl('rect', { x: -9, y: -9, width: 18, height: 18, rx: 4 }, eg);
-      const elabel = svgEl('text', { x: 0, y: -14, 'text-anchor': 'middle', class: 'edge-label' }, eg);
-      return Object.assign({}, r, { edgeAt, eg, elabel });
+      const s = M ? 9 : 14;
+      svgEl('rect', { x: -s, y: -s, width: s * 2, height: s * 2, rx: 5 }, eg);
+      const elabel = svgEl('text', { x: 0, y: -s - 5, 'text-anchor': 'middle', class: 'edge-label' }, eg);
+      return Object.assign({}, r, { edgeAt, eg, elabel, ug, P, routes: { toOrigin, toEdge, edgeOrigin } });
     });
-    return Object.assign(m, { gl, gn, gp, regions });
+    const og = svgEl('g', { class: 'origin', transform: `translate(${O.x},${O.y})` }, gn);
+    const ow = M ? 30 : 46, oh = M ? 13 : 20;
+    svgEl('rect', { x: -ow, y: -oh, width: ow * 2, height: oh * 2, rx: 7 }, og);
+    svgEl('text', { x: 0, y: M ? 4 : 5, 'text-anchor': 'middle', class: 'origin-label' }, og).textContent = '🖥 origen';
+    const setRoutes = cdn => regions.forEach(r => {
+      r.routes.toOrigin.classList.toggle('on', !cdn);
+      r.routes.toEdge.classList.toggle('on', cdn);
+      r.routes.edgeOrigin.classList.toggle('on', cdn);
+    });
+    // Latencia de una respuesta, sobre el usuario
+    const showMs = (r, ms) => pop(gp, r.P.x + (r.x > 600 ? 1 : -1) * (M ? 26 : 48), r.P.y + 5, `${Math.round(ms)} ms`, msColor(ms));
+    return Object.assign(m, { gl, gn, gp, regions, setRoutes, showMs });
   }
 
   /* ---------- 14. CDN: llevar el contenido cerca ---------- */
 
   S.cdn = slide => {
-    const { svg, clock, gp, regions } = cdnBase(slide);
+    const { svg, clock, gp, regions, setRoutes, showMs } = cdnBase(slide);
     const rand = CacheKit.rng(3);
     let cdn = false, focus = false, cached, stats, originReqs, total;
     const bars = slide.querySelector('.region-bars');
@@ -595,8 +622,8 @@
     const draw = () => {
       regions.forEach(r => {
         r.eg.classList.toggle('on', cdn);
-        r.eg.classList.toggle('warm', cdn && !!cached[r.id]);
-        r.elabel.textContent = cdn ? (cached[r.id] ? '✓' : 'vacío') : '';
+        r.eg.classList.toggle('warm', cdn && cached[r.id] === true);
+        r.elabel.textContent = cdn ? (cached[r.id] === true ? 'borde ✓' : 'borde vacío') : '';
         const st = stats[r.id], avg = st.n ? st.sum / st.n : null;
         const row = bars.querySelector(`[data-r=${r.id}]`);
         row.querySelector('b').style.width = avg ? `${Math.min(100, avg / 3.2)}%` : '0';
@@ -607,7 +634,7 @@
     };
     const request = r => {
       total++;
-      const done = ms => { stats[r.id].n++; stats[r.id].sum += ms; draw(); };
+      const done = ms => { stats[r.id].n++; stats[r.id].sum += ms; showMs(r, ms); draw(); };
       if (!cdn) {
         const ms = msBetween(r, ORIGIN);
         originReqs++;
@@ -615,7 +642,7 @@
         return;
       }
       const e = r.edgeAt, toEdge = msBetween(r, e);
-      if (cached[r.id]) {
+      if (cached[r.id] === true) {
         flyLine(clock, gp, r, e, REQ, travel(toEdge) / 2, () => flyLine(clock, gp, e, r, PINK, travel(toEdge) / 2, () => done(toEdge), 6));
         return;
       }
@@ -636,7 +663,7 @@
       };
       clock.after(rand() * 1.2, tick);
     });
-    const restart = () => { clock.clear(); gp.innerHTML = ''; resetStats(); schedule(); draw(); };
+    const restart = () => { clock.clear(); gp.innerHTML = ''; resetStats(); setRoutes(cdn); schedule(); draw(); };
     const setCdn = v => {
       cdn = v;
       slide.querySelector('[data-act=cdn]').textContent = cdn ? '⏻ Apagar CDN' : '🌐 Prender CDN';
@@ -657,8 +684,9 @@
   /* ---------- 15. distribuir e invalidar ---------- */
 
   S.distribuir = slide => {
-    const { svg, clock, gp, regions } = cdnBase(slide);
+    const { svg, clock, gp, regions, setRoutes } = cdnBase(slide);
     const rand = CacheKit.rng(5);
+    setRoutes(true);
     const VCOL = { 1: '#94a3b8', 2: '#fb923c' };
     const NAME = { 1: 'app.3f2a.js', 2: 'app.9c1e.js' };
     let strategy = 'purga', originV, edgeV, served, purgedEdges, deployed, gen = 0;

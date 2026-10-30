@@ -415,13 +415,28 @@ b.amber { color: #d97706; }
 html.mobile .httpc .hdr { font-size: 11px; }
 
 /* ---------- CDN ---------- */
-.cdnmap .map ellipse { fill: #94a3b8; opacity: .08; }
+.cdnmap .map polygon { fill: #94a3b8; opacity: .13; stroke: #94a3b8; stroke-opacity: .25; stroke-width: 1; stroke-linejoin: round; }
+.cdnmap .route { stroke-width: 2; stroke-dasharray: 5 6; opacity: 0; transition: opacity .4s; }
+.cdnmap .route.on { opacity: .55; }
+.cdnmap .origin-route { stroke: #7dd3fc; }
+.cdnmap .edge-route { stroke: #f472b6; opacity: 0; }
+.cdnmap .edge-route.on { opacity: .9; stroke-dasharray: none; stroke-width: 2.5; }
+.cdnmap .back-route { stroke: #64748b; }
+.cdnmap .back-route.on { opacity: .3; }
 .cdnmap .origin rect { fill: #0e2338; stroke: var(--cyan); stroke-width: 2.5; }
-.cdnmap .user circle { fill: #7dd3fc; opacity: .9; }
+.cdnmap .origin-label { fill: #fff; font: 700 14px var(--sans); }
+.cdnmap .user circle { fill: #0f1731; stroke: #7dd3fc; stroke-width: 2; }
+.cdnmap .user-ico { font-size: 12px; }
+.cdnmap .city { fill: #e2e8f0; font: 600 13px var(--sans); }
 .cdnmap .edge-node rect { fill: none; stroke: none; }
-.cdnmap .edge-node.on rect { fill: #1a0f1c; stroke: var(--v, #f472b6); stroke-width: 2; }
-.cdnmap .edge-node.warm rect { fill: #4a1838; stroke: #f472b6; }
-.cdnmap .edge-label { fill: #f9a8d4; font: 600 11px var(--mono); }
+.cdnmap .edge-node.on rect { fill: #1a0f1c; stroke: var(--v, #f472b6); stroke-width: 2.5; }
+.cdnmap .edge-node.warm rect { fill: #6b1f4f; stroke: #f472b6; }
+.cdnmap .edge-label { fill: #f9a8d4; font: 700 12px var(--mono); }
+.cdnmap .pop { font-size: 15px; }
+html.mobile .cdnmap .city { font-size: 9px; }
+html.mobile .cdnmap .origin-label { font-size: 10px; }
+html.mobile .cdnmap .edge-label { font-size: 8px; }
+html.mobile .cdnmap .user-ico { font-size: 8px; }
 .region-bars { display: grid; gap: 4px; font-size: 13px; }
 .rb { display: grid; grid-template-columns: 96px 1fr 62px; align-items: center; gap: 8px; color: #cbd5e1; }
 .rb i { height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden; }
