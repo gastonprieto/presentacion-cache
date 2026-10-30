@@ -29,6 +29,7 @@
     <p class="sub">Caché, caché HTTP, CDN y precálculo: qué ganamos, qué pagamos y qué hay que decidir.</p>
     <p class="keys"><kbd>→</kbd> avanzar · <kbd>S</kbd> notas del orador · <kbd>F</kbd> pantalla completa · <kbd>O</kbd> vista general</p>
     <p class="keys-mobile">Deslizá hacia abajo para recorrerla. Las simulaciones se activan al llegar a cada una.</p>
+    <a class="repo-link with-text" href="https://github.com/gastonprieto/presentacion-cache" target="_blank" rel="noopener" title="Código en GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>github.com/gastonprieto/presentacion-cache</span></a>
   </div>
   <aside class="notes">
     Hoy el tema no es "la caché" sino algo más general: tenemos una operación cara (una consulta lenta, un cálculo pesado, un archivo que viene de lejos) y queremos que deje de serlo. La caché es la herramienta más conocida, pero no la única: también se puede calcular antes de que lo pidan.
@@ -706,10 +707,33 @@ REFRESH MATERIALIZED VIEW ventas_por_dia;</pre>
     <div class="card good fragment"><div class="ico">🌐</div><h4>HTTP y CDN para lo estático y lejano</h4><p>max-age, ETag, private/public, y nombres versionados para no invalidar.</p></div>
     <div class="card good fragment"><div class="ico">⏱</div><h4>Precalcular si la pregunta se conoce</h4><p>Job, vista materializada o sumar al escribir: el costo se mueve, no desaparece.</p></div>
   </div>
-  <a class="repo-link" href="https://github.com/gastonprieto/presentacion-cache" target="_blank" rel="noopener" title="Código en GitHub" aria-label="Código en GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
   <aside class="notes">
     Repasar cada tarjeta conectándola con su demo. La idea de fondo: hacer barata una operación cara siempre mueve el costo a otro lado (memoria, frescura, escrituras, complejidad). La pregunta es dónde nos conviene pagarlo.
     Pregunta para la clase: ¿qué operación cara de un sistema que conozcan resolverían con cada una de estas herramientas?
+  </aside>
+</section>
+
+<!-- ============ SEGUIR EXPLORANDO ============ -->
+<section class="outro">
+  <div class="kicker">Seguir explorando</div>
+  <h2>Llevátela y probala</h2>
+  <div class="outro-grid">
+    <figure class="qr">
+      <img src="img/qr.svg" alt="QR a la presentación publicada">
+      <figcaption>Escaneá para abrirla en el celular<br>gastonprieto.github.io/<br>presentacion-cache</figcaption>
+    </figure>
+    <div class="cta">
+      <h3>🧪 Animate a probar tu propia arquitectura</h3>
+      <p>En el <b>Architecture Playground</b> armás un sistema con las piezas que vimos (clientes, servicios, load balancers, proxies, cachés, colas, brokers) y lo ponés bajo carga.</p>
+      <p>Arrancá por el preset <b>Cache</b> y sumale una caché HTTP en el proxy, o una base que tarde más.</p>
+      <a class="btn primary" href="https://gastonprieto.github.io/architecture-playground/" target="_blank" rel="noopener">Abrir el playground →</a>
+      <br><a class="repo-link with-text" href="https://github.com/gastonprieto/presentacion-cache" target="_blank" rel="noopener" title="Código en GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>github.com/gastonprieto/presentacion-cache</span></a>
+    </div>
+  </div>
+  <aside class="notes">
+    Mostrar el QR para que se lleven la presentación (en el celular se ve como documento y las simulaciones funcionan igual). El código está en GitHub.
+    Invitar a armar su propia arquitectura en el playground, arrancando por el preset indicado.
+    Pregunta para la clase: ¿qué arquitectura de un sistema que usen todos los días se animarían a armar en el playground?
   </aside>
 </section>
 
