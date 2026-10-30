@@ -340,6 +340,89 @@ test('escena reemplazo: paso a paso', async page => {
   check(JSON.stringify(st.slots) === JSON.stringify(['A', 'B', 'C']), JSON.stringify(st.slots));
 });
 
+/* ---------- escenas: TTL, invalidación, caché fría, dónde vive ---------- */
+
+Object.assign(SL, { ttl: 6, invalidar: 7, fria: 8, donde: 9, nocachear: 10 });
+
+test('escena ttl: ttl 0 da hit rate 0', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.ttl, `(sec, SI) => {
+    eval(SI)(sec, 'input.ttl', 0);
+    const sim = sec._scene.sim;
+    sim.fastForward(20);
+    return { ttl: sim.o.ttl, hitRate: sim.window(15).hitRate, n: sim.window(15).n };
+  }`, SLIDE_INPUT);
+  check(r.ttl === 0 && r.n > 0 && r.hitRate === 0, JSON.stringify(r));
+});
+
+test('escena invalidar: delete elimina stale', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.invalidar, sec => {
+    const sim = sec._scene.sim;
+    sec.querySelector('.seg[data-group=inv] [data-v=delete]').click();
+    for (let i = 0; i < 3; i++) { sec.querySelector('[data-act=write]').click(); sim.fastForward(3); }
+    sim.fastForward(2);
+    const del = sim.window(11).stale;
+    sec.querySelector('.seg[data-group=inv] [data-v=none]').click();
+    sim.fastForward(8);
+    for (let i = 0; i < 3; i++) { sec.querySelector('[data-act=write]').click(); sim.fastForward(3); }
+    return { inv: sim.o.invalidate, del, none: sim.window(9).stale };
+  });
+  check(r.del === 0, `stale con delete=${r.del}`);
+  check(r.none > 0, `stale sin invalidar=${r.none}`);
+});
+
+test('escena fria: reiniciar causa errores y las mitigaciones los evitan', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.fria, sec => {
+    const run = () => {
+      const sim = sec._scene.sim;
+      sim.fastForward(8);
+      sec.querySelector('[data-act=flush]').click();
+      sim.fastForward(4);
+      return sim.window(4).err;
+    };
+    const plain = run();
+    sec.querySelector('input[data-opt=coalesce]').click();
+    const mitigated = run();
+    return { plain, mitigated };
+  });
+  check(r.plain > 0, `sin mitigación err=${r.plain}`);
+  check(r.mitigated === 0, `con coalescing err=${r.mitigated}`);
+});
+
+test('estampida: reset a mitad', async (page, errors) => {
+  await open(page);
+  const r = await evalScene(page, SL.fria, sec => {
+    const sim = sec._scene.sim;
+    sim.fastForward(5);
+    sec.querySelector('[data-act=flush]').click();
+    sim.fastForward(0.3);
+    sec.querySelector('input[data-opt=jitter]').click();
+    sim.fastForward(6);
+    return { old: sim.log.filter(e => e.gen !== sim.gen).length, n: sim.log.length };
+  });
+  check(r.old === 0 && r.n > 0, JSON.stringify(r));
+  check(errors.length === 0, errors.join(' | '));
+});
+
+test('escena donde: local deja réplicas con precio viejo', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.donde, sec => {
+    const sim = sec._scene.sim;
+    const run = v => {
+      sec.querySelector(`.seg[data-group=where] [data-v=${v}]`).click();
+      sim.fastForward(10);
+      sec.querySelector('[data-act=write]').click();
+      sim.fastForward(8);
+      return sim.window(8).stale;
+    };
+    return { local: run('local'), shared: run('shared') };
+  });
+  check(r.local > 0, `stale local=${r.local}`);
+  check(r.shared === 0, `stale compartida=${r.shared}`);
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

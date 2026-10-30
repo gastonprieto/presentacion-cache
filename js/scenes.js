@@ -114,6 +114,49 @@
     return life(sim);
   };
 
+  /* ---------- 6. TTL ---------- */
+
+  S.ttl = slide => {
+    const sim = setupCache(slide, { cache: 'shared', rate: 6, capacity: 20, ttl: 30 });
+    const r = slide.querySelector('input.ttl'), out = slide.querySelector('.ttl-val');
+    r.addEventListener('input', () => { sim.set('ttl', +r.value); out.textContent = `${r.value} s`; });
+    on(slide, '[data-act=write]', () => sim.writePrice(0));
+    slide.querySelector('input[data-opt=auto]').addEventListener('change', e => sim.set('writeRate', e.target.checked ? 0.2 : 0));
+    return life(sim);
+  };
+
+  /* ---------- 7. invalidación ---------- */
+
+  S.invalidar = slide => {
+    const sim = setupCache(slide, { cache: 'shared', rate: 6, capacity: 20, ttl: 60, invalidate: 'none' });
+    seg(slide, 'inv', v => { sim.set('invalidate', v); showModeIn(slide, v); });
+    on(slide, '[data-act=write]', () => sim.writePrice(0));
+    return life(sim);
+  };
+
+  /* ---------- 8. caché fría y estampida ---------- */
+
+  S.fria = slide => {
+    const opt = k => slide.querySelector(`input[data-opt=${k}]`).checked;
+    const opts = () => ({ cache: 'shared', rate: 16, capacity: 30, ttl: 20, coalesce: opt('coalesce'), jitter: opt('jitter') ? 0.3 : 0 });
+    const sim = setupCache(slide, opts());
+    const restart = () => { sim.reset(opts()); if (opt('prewarm')) sim.prewarm(30); };
+    if (opt('prewarm')) sim.prewarm(30);
+    on(slide, '[data-act=flush]', () => sim.flushCache());
+    on(slide, '[data-act=reset]', restart);
+    slide.querySelectorAll('input[data-opt]').forEach(i => i.addEventListener('change', restart));
+    return life(sim);
+  };
+
+  /* ---------- 9. dónde vive la caché ---------- */
+
+  S.donde = slide => {
+    const sim = setupCache(slide, { cache: 'local', replicas: 3, rate: 6, capacity: 10, ttl: 60, invalidate: 'delete' });
+    seg(slide, 'where', v => { sim.set('cache', v); showModeIn(slide, v); });
+    on(slide, '[data-act=write]', () => sim.writePrice(0, 0));
+    return life(sim);
+  };
+
   /* ---------- 5. reemplazo: casilleros paso a paso ---------- */
 
   const SEQS = {

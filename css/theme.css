@@ -402,3 +402,5 @@ html.mobile .ways-foot { font-size: 15px; margin-top: 12px; }
 .algo-table td.cur { color: #f472b6; background: rgba(244,114,182,.1); border-radius: 6px; }
 html.mobile .evict .slot-key { font-size: 32px; }
 html.mobile .evict .evict-count { font-size: 15px; }
+b.amber { color: #d97706; }
+.field small { color: var(--muted); font-size: 12px; }

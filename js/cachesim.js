@@ -337,7 +337,7 @@
         if (o.cache === 'local') {
           const f = Math.min(1, this.caches[i].keys().length / Math.max(1, o.capacity)), h = (s.hh * 2 - 12) * f;
           s.memFill.setAttribute('y', s.hh - 6 - h); s.memFill.setAttribute('height', h);
-          s.sub.textContent = `caché local ${this.caches[i].keys().length}/${o.capacity}`;
+          s.sub.textContent = `caché ${this.caches[i].keys().length}/${o.capacity}`;
         } else s.sub.textContent = o.cache ? 'busca en la caché' : 'consulta la DB';
       });
       if (this.front) this.front.sub.textContent = 'round robin';

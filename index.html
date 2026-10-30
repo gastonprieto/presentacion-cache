@@ -205,6 +205,150 @@
   </aside>
 </section>
 
+<!-- ============ 6. TTL ============ -->
+<section data-scene="ttl">
+  <div class="kicker pink">Expiración</div>
+  <h2>TTL: fresco o rápido</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Cada valor guardado <b>vence</b> después de un tiempo (TTL). Si el precio cambia en la DB, la caché sigue respondiendo el <b class="amber">viejo</b> hasta que vence.</p>
+      <div class="box">
+        <div class="label">TTL</div>
+        <div class="slider-row"><input class="ttl" type="range" min="0" max="60" step="5" value="30"><span class="ttl-val rate-out">30 s</span></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-act="write">✎ Cambiar precio del #0</button>
+        <label class="field"><input type="checkbox" data-opt="auto"> cada 5 s</label>
+      </div>
+      <div class="cstats" data-fields="hitRate,stale,dbReqs" data-window="10"></div>
+      <ul class="points">
+        <li class="fragment">TTL largo → más hits, datos más viejos.</li>
+        <li class="fragment">TTL corto → datos frescos, más carga en la DB.</li>
+        <li class="fragment">El TTL dice <b>cuánto tiempo aceptás que el dato esté desactualizado</b>.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Con TTL 30: cambiar el precio del producto #0 (el más pedido) y ver respuestas ámbar (precio viejo) hasta 30 s después. Prender "cada 5 s": el porcentaje de respuestas viejas se mantiene alto.
+    Bajar el TTL a 5: casi no hay viejas, pero el hit rate baja y la DB trabaja más. TTL 0 es lo mismo que no tener caché.
+    El TTL es una decisión de negocio, no técnica: ¿cuánto tiempo puede estar mal el precio que ve un cliente? Para el catálogo, quizás minutos; para el stock al pagar, nada.
+    Pregunta para la clase: ¿qué TTL le pondrían al nombre de un producto, a su precio y a su stock?
+  </aside>
+</section>
+
+<!-- ============ 7. INVALIDACIÓN ============ -->
+<section data-scene="invalidar">
+  <div class="kicker pink">Invalidación</div>
+  <h2>Al escribir, avisar a la caché</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">En vez de esperar a que venza, el que <b>escribe</b> en la DB también toca la caché.</p>
+      <div class="seg" data-group="inv">
+        <button data-v="none" class="active">No avisar</button><button data-v="delete">Borrar la clave</button><button data-v="update">Actualizarla</button>
+      </div>
+      <p class="mode-text" data-mode="none">Sólo se actualiza la DB: precio viejo hasta el TTL (60 s).</p>
+      <p class="mode-text" data-mode="delete" hidden>Se borra la clave: el próximo pedido es un miss y trae el precio nuevo.</p>
+      <p class="mode-text" data-mode="update" hidden>Se escribe el precio nuevo también en la caché: el próximo pedido ya es hit.</p>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio del #0</button></div>
+      <div class="cstats" data-fields="hitRate,stale,dbReqs" data-window="10"></div>
+      <ul class="points">
+        <li class="fragment">Hay que conocer <b>todas</b> las claves que dependen del dato.</li>
+        <li class="fragment">"Hay dos cosas difíciles en computación: invalidar cachés y ponerle nombre a las cosas."</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Mostrar "No avisar" y cambiar el precio: ámbar durante un buen rato. Pasar a "Borrar la clave": al cambiar el precio aparece "✕ borra" sobre Redis y el siguiente pedido trae el precio nuevo desde la DB. "Actualizarla" escribe el valor nuevo directo.
+    En la vida real el problema es saber qué borrar: el precio del producto 42 aparece en /productos/42, en la lista de la categoría, en la búsqueda, en el carrito… Cada vista cacheada es una clave más para invalidar.
+    Borrar suele ser más seguro que actualizar: si dos escrituras compiten, actualizar puede dejar en la caché el valor de la que llegó última a la caché, no a la DB.
+    Pregunta para la clase: si el precio del producto 42 aparece en cinco páginas distintas cacheadas, ¿cómo se enteran todas de que cambió?
+  </aside>
+</section>
+
+<!-- ============ 8. CACHÉ FRÍA ============ -->
+<section data-scene="fria">
+  <div class="kicker red">Caché fría</div>
+  <h2>Se vació la caché</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Con <b>16 req/s</b> la DB está tranquila gracias a la caché. Pero si la caché se vacía (reinicio, deploy) o <b>vencen muchas claves juntas</b>, todos van a la DB a la vez: <b>estampida</b>.</p>
+      <div class="actions"><button class="btn danger" data-act="flush">⟲ Reiniciar caché</button><button class="btn ghost" data-act="reset">↺</button></div>
+      <div class="box">
+        <div class="label">Mitigaciones</div>
+        <label class="field"><span>🧩 Un solo cálculo por clave <small>(coalescing)</small></span><input type="checkbox" data-opt="coalesce"></label>
+        <label class="field"><span>🎲 TTL con variación ±30% <small>(jitter)</small></span><input type="checkbox" data-opt="jitter"></label>
+        <label class="field"><span>🔥 Precalentar al arrancar</span><input type="checkbox" data-opt="prewarm" checked></label>
+      </div>
+      <div class="cstats" data-fields="hitRate,p95,err" data-window="4"></div>
+    </div>
+  </div>
+  <aside class="notes">
+    Arranca con la caché precalentada y TTL de 20 s: a los 20 s vencen todas las claves juntas (se cargaron al mismo tiempo) y hay una estampida sola. "Reiniciar caché" la provoca a mano.
+    Sin mitigaciones: cola llena en la DB, 503 en rojo. Coalescing: si 30 pedidos del producto 42 hacen miss a la vez, sólo uno consulta la DB y los demás esperan esa respuesta. Jitter: el TTL varía un poco por clave, así no vencen todas juntas. Precalentar: cargar las claves populares antes de abrir el tráfico (apagarlo y reiniciar con ↺ para ver el arranque en frío).
+    Lección: con caché, la DB queda dimensionada para los misses, no para el tráfico total. Si la caché falla, la DB recibe una carga para la que no está preparada.
+    Pregunta para la clase: ¿qué pasa con la DB el día que reinician Redis en el horario pico?
+  </aside>
+</section>
+
+<!-- ============ 9. DÓNDE VIVE ============ -->
+<section data-scene="donde">
+  <div class="kicker pink">Dónde vive</div>
+  <h2>En cada réplica o compartida</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Productos tiene <b>3 réplicas</b> (copias iguales, con algo adelante que reparte los pedidos). ¿Cada una con su caché o una para todas?</p>
+      <div class="seg" data-group="where">
+        <button data-v="local" class="active">En cada réplica</button><button data-v="shared">Compartida (Redis)</button>
+      </div>
+      <p class="mode-text" data-mode="local">En memoria del proceso: sin viaje por la red, pero cada réplica llena la suya y tiene <b>su versión</b> del dato.</p>
+      <p class="mode-text" data-mode="shared" hidden>Una sola caché: un salto de red más, pero todos ven lo mismo y el lugar se aprovecha mejor.</p>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio (en réplica 1)</button></div>
+      <div class="cstats" data-fields="hitRate,stale,p50" data-window="8"></div>
+    </div>
+  </div>
+  <aside class="notes">
+    "En cada réplica": el hit rate es más bajo (cada una tiene que llenar la suya y el mismo producto ocupa lugar tres veces). Cambiar el precio: la réplica 1 borra su copia, pero las otras dos siguen sirviendo el precio viejo hasta que les venza el TTL.
+    "Compartida": un borrado alcanza para todos. Cuesta un salto de red (algo de latencia) y Redis pasa a ser una pieza más que se puede caer.
+    Es común combinar: una caché local chiquita y de TTL muy corto para lo muy caliente, y Redis atrás.
+    Pregunta para la clase: ¿qué pasa con la caché local cada vez que hacen un deploy y las réplicas se reinician?
+  </aside>
+</section>
+
+<!-- ============ 10. QUÉ NO CACHEAR ============ -->
+<section>
+  <div class="kicker red">Restricciones</div>
+  <h2>Qué no cachear (o con mucho cuidado)</h2>
+  <div class="summary">
+    <div class="card bad fragment"><div class="ico">📦</div><h4>Stock al pagar, saldos</h4><p>Necesitan el valor real <b>ahora</b>: un dato viejo vende lo que no hay.</p></div>
+    <div class="card bad fragment"><div class="ico">👤</div><h4>Datos de un usuario en una caché compartida</h4><p>Con la clave mal armada, un usuario ve los datos de otro.</p></div>
+    <div class="card bad fragment"><div class="ico">✍️</div><h4>Lo que se escribe más de lo que se lee</h4><p>Se invalida antes de reutilizarse: sólo suma trabajo.</p></div>
+    <div class="card bad fragment"><div class="ico">🧠</div><h4>Lo que no entra</h4><p>La memoria es limitada: si todo es distinto, el hit rate es bajo.</p></div>
+    <div class="card good fragment"><div class="ico">🏷</div><h4>Sí: catálogo, precios con TTL corto, configuración</h4><p>Se lee mucho, cambia poco y tolera unos segundos de atraso.</p></div>
+    <div class="card good fragment"><div class="ico">📐</div><h4>Sí: resultados caros y repetidos</h4><p>Búsquedas populares, páginas armadas, respuestas de otros servicios.</p></div>
+  </div>
+  <aside class="notes">
+    Recorrer cada tarjeta con un ejemplo de la tienda. El de "datos de un usuario" lo vamos a ver en vivo con la caché HTTP.
+    Una buena regla: cachear lo que se lee mucho más de lo que se escribe y tolera estar un poco desactualizado. Si una de las dos no se cumple, pensarlo dos veces.
+    Pregunta para la clase: ¿el carrito de compras se puede cachear? ¿con qué clave?
+  </aside>
+</section>
+
 <!-- ============ 20. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>
