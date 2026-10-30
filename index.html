@@ -349,6 +349,100 @@
   </aside>
 </section>
 
+<!-- ============ 11. CACHÉ HTTP ============ -->
+<section data-scene="http">
+  <div class="kicker pink">Caché HTTP</div>
+  <h2>El navegador también cachea</h2>
+  <div class="demo">
+    <div class="stage"><svg class="sim"></svg></div>
+    <div class="panel">
+      <p class="lead">El servidor le dice al navegador <b>cuánto tiempo</b> puede reusar la respuesta: <code>Cache-Control: max-age=N</code> (segundos).</p>
+      <div class="seg" data-group="maxage">
+        <button data-v="0">max-age=0</button><button data-v="10">max-age=10</button><button data-v="60" class="active">max-age=60</button>
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-act="get">⬇ Pedir app.js</button>
+        <label class="field"><input type="checkbox" data-opt="auto"> cada 4 s</label>
+      </div>
+      <div class="hstats"></div>
+      <ul class="points">
+        <li class="fragment">Mientras la copia es fresca, el pedido <b>ni sale</b> de la máquina: 0 ms, 0 bytes.</li>
+        <li class="fragment">El servidor no se entera: <b>no lo puede invalidar</b> hasta que venza.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Todo lo anterior era una caché que pusimos nosotros (Redis). HTTP trae una caché incorporada en cada navegador, y el servidor la controla con headers.
+    Con max-age=60: el primer pedido viaja y vuelve con el archivo; los siguientes se responden desde el cajón rosa del navegador (mirar la edad de la copia). Cuando la edad pasa 60, el próximo pedido vuelve a salir. Con max-age=0 siempre sale.
+    Es la misma idea de TTL, pero ahora la caché está en la máquina del usuario: si publicamos una versión nueva de app.js, los que tienen la copia la siguen usando hasta que venza. Esto lo resuelve la CDN con nombres versionados (lo vemos más adelante).
+    Pregunta para la clase: ¿qué max-age le pondrían al logo de la tienda? ¿y al JSON con el precio de un producto?
+  </aside>
+</section>
+
+<!-- ============ 12. VALIDACIÓN ============ -->
+<section data-scene="etag">
+  <div class="kicker pink">Validación</div>
+  <h2>Validar en vez de bajar de nuevo</h2>
+  <div class="demo">
+    <div class="stage"><svg class="sim"></svg></div>
+    <div class="panel">
+      <p class="lead">Venció la copia, pero quizás <b>no cambió</b>. Con un <code>ETag</code> (huella del archivo) el navegador pregunta "¿sigue siendo esta?".</p>
+      <div class="seg" data-group="etag">
+        <button data-v="off" class="active">Sin ETag</button><button data-v="on">Con ETag</button>
+      </div>
+      <p class="mode-text" data-mode="off">Cada vez: <code>200 OK</code> con los <b>180 KB</b> completos.</p>
+      <p class="mode-text" data-mode="on" hidden>Manda <code>If-None-Match: "v1"</code>. Si no cambió: <code>304 Not Modified</code>, <b>sin cuerpo</b>.</p>
+      <div class="actions">
+        <button class="btn primary" data-act="get">⬇ Pedir app.js</button>
+        <button class="btn" data-act="change">✎ Cambiar archivo</button>
+      </div>
+      <div class="hstats"></div>
+      <ul class="points">
+        <li class="fragment">El viaje se hace igual (latencia), pero <b>no se baja</b> el archivo.</li>
+        <li class="fragment">Frescura (<code>max-age</code>) + validación (<code>ETag</code>) se combinan.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    La copia está vencida (max-age=0 en este ejemplo) pero el archivo no cambió. Sin ETag: cada pedido baja los 180 KB. Con ETag: el primero baja el archivo con su huella "v1"; los siguientes preguntan con If-None-Match y el servidor contesta 304 (un punto chiquito): "usá la que tenés". Cambiar el archivo: el siguiente pedido vuelve a ser 200 con la huella nueva.
+    Existe también Last-Modified / If-Modified-Since, con la fecha en vez de la huella.
+    Pregunta para la clase: ¿un 304 ahorra tiempo, ahorra bytes, o las dos cosas?
+  </aside>
+</section>
+
+<!-- ============ 13. PRIVADA O COMPARTIDA ============ -->
+<section data-scene="privada">
+  <div class="kicker red">Privada o compartida</div>
+  <h2>¿Quién puede guardar la respuesta?</h2>
+  <div class="demo">
+    <div class="stage"><svg class="sim"></svg></div>
+    <div class="panel">
+      <p class="lead">En el medio hay una <b>caché compartida</b>: un proxy (servidor intermedio) que guarda respuestas <b>para todos</b>. Ana y Beto piden <code>/mi-cuenta</code>.</p>
+      <div class="seg" data-group="cc">
+        <button data-v="public" class="active">public</button><button data-v="private">private</button><button data-v="no-store">no-store</button>
+      </div>
+      <p class="mode-text" data-mode="public"><code>public</code>: cualquiera la puede guardar, también el proxy.</p>
+      <p class="mode-text" data-mode="private" hidden><code>private</code>: sólo el navegador de cada uno; el proxy no.</p>
+      <p class="mode-text" data-mode="no-store" hidden><code>no-store</code>: nadie la guarda.</p>
+      <div class="actions">
+        <button class="btn ana" data-act="ana">👩 Ana pide</button>
+        <button class="btn beto" data-act="beto">👨 Beto pide</button>
+      </div>
+      <div class="hstats"></div>
+      <ul class="points">
+        <li class="fragment">Lo personal: <code>private</code> (o <code>no-store</code> si es sensible).</li>
+        <li class="fragment">Lo igual para todos (catálogo, imágenes): <code>public</code>.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Con public: Ana pide /mi-cuenta, el proxy guarda la respuesta. Beto pide /mi-cuenta y el proxy le devuelve… la de Ana (punto del color de Ana y cartel rojo). Esto pasó de verdad en sitios grandes por un header mal puesto.
+    Con private: el proxy deja pasar; cada navegador guarda la suya. Con no-store: nadie guarda nada (datos bancarios, por ejemplo).
+    Lo mismo vale para una caché propia (Redis): la clave tiene que incluir al usuario si la respuesta depende del usuario.
+    Pregunta para la clase: ¿qué header le pondrían a la respuesta del carrito? ¿y a la foto de un producto?
+  </aside>
+</section>
+
 <!-- ============ 20. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>

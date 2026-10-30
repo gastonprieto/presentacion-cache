@@ -286,5 +286,230 @@
     };
   };
 
+  /* ---------- helpers de escenas manuales ---------- */
+
+  // Prepara <svg class="sim"> para una escena manual con su propio Clock
+  function manual(slide, cls) {
+    const svg = slide.querySelector('svg.sim');
+    svg.setAttribute('viewBox', `0 0 ${NetKit.W} ${NetKit.H}`);
+    svg.classList.add('netsim', cls);
+    return { svg, clock: new Clock(), M: NetKit.MOBILE };
+  }
+
+  // Avanza un Clock sin animar (para las pruebas): mismo paso que fastForward de las simulaciones
+  function ffClock(clock, sec) {
+    const sp = NetKit.Speed.value;
+    NetKit.Speed.value = 1;
+    try { for (let i = 0, n = Math.round(sec / 0.05); i < n; i++) clock._tick(0, 50); }
+    finally { NetKit.Speed.value = sp; }
+  }
+
+  // Caja con título (y emoji opcional) y una línea de subtítulo; devuelve el nodo con .sub
+  function nbox(layer, n, title, emoji, cls) {
+    const g = svgEl('g', { class: cls || 'srv', transform: `translate(${n.x},${n.y})` }, layer);
+    svgEl('rect', { class: 'node-box', x: -n.hw, y: -n.hh, width: n.hw * 2, height: n.hh * 2, rx: 10 }, g);
+    const tx = emoji ? -n.hw + 36 : 0, anchor = emoji ? 'start' : 'middle';
+    if (emoji) svgEl('text', { x: -n.hw + 19, y: 7, class: 't-emoji', 'text-anchor': 'middle' }, g).textContent = emoji;
+    svgEl('text', { x: tx, y: -3, class: 't-title small', 'text-anchor': anchor }, g).textContent = title;
+    n.sub = svgEl('text', { x: tx, y: 14, class: 't-sub', 'text-anchor': anchor }, g);
+    n.g = g;
+    return n;
+  }
+
+  function link(layer, a, b, M, cls) {
+    return svgEl('path', { class: 'link ' + (cls || ''), d: curve(edge(a, b, M), edge(b, a, M), M) }, layer);
+  }
+
+  // Punto que viaja de a hacia b (con el reloj de la escena)
+  function fly(clock, layer, a, b, M, color, done, r = 6, dur = 0.5) {
+    const el = svgEl('circle', { r, fill: color, class: 'pk' }, layer);
+    clock.animate(dur, p => {
+      const P = cubic(edge(a, b, M), edge(b, a, M), p, M);
+      el.setAttribute('cx', P.x); el.setAttribute('cy', P.y);
+    }, () => { el.remove(); done && done(); });
+  }
+
+  // Contadores HTML simples: [['clave', 'etiqueta'], …] → update(obj)
+  function hstats(slide, fields) {
+    const el = slide.querySelector('.hstats');
+    el.className = 'hstats stats';
+    el.style.gridTemplateColumns = `repeat(${fields.length}, 1fr)`;
+    el.innerHTML = fields.map(([k, l]) => `<div class="stat s-${k}"><b data-f="${k}">0</b><span>${l}</span></div>`).join('');
+    return v => fields.forEach(([k]) => { el.querySelector(`[data-f="${k}"]`).textContent = v[k]; });
+  }
+
+  const PINK = '#f472b6', GREEN = C.ok, REQ = C.req, RED = C.err;
+  const fmtKB = kb => (kb >= 1000 ? `${(kb / 1000).toFixed(1)} MB` : `${Math.round(kb * 10) / 10} KB`);
+
+  /* ---------- 11. caché HTTP en el navegador ---------- */
+
+  S.http = slide => {
+    const { svg, clock, M } = manual(slide, 'httpc');
+    const W = NetKit.W;
+    let maxAge = 60, copy = null, sent = 0, fromCache = 0, kb = 0, auto = null;
+    const nav = M ? { x: W / 2, y: 80, hw: 120, hh: 46 } : { x: 190, y: 250, hw: 130, hh: 40 };
+    const srv = M ? { x: W / 2, y: 330, hw: 110, hh: 34 } : { x: 700, y: 250, hw: 110, hh: 40 };
+    const gl = svgEl('g', {}, svg), gn = svgEl('g', {}, svg), gp = svgEl('g', {}, svg);
+    link(gl, nav, srv, M);
+    nbox(gn, nav, 'Navegador', '💻', 'client');
+    nav.g.style.setProperty('--c', REQ);
+    nav.sub.textContent = 'pide /static/app.js';
+    nbox(gn, srv, 'tienda.com', '🖥');
+    srv.sub.textContent = 'sirve /static/app.js';
+    const drawer = svgEl('g', { transform: `translate(${nav.x},${nav.y + nav.hh + (M ? 34 : 46)})` }, gn);
+    svgEl('rect', { class: 'drawer', x: -nav.hw, y: -26, width: nav.hw * 2, height: 52, rx: 10 }, drawer);
+    const dTitle = svgEl('text', { x: -nav.hw + 12, y: -6, class: 't-sub' }, drawer);
+    const dAge = svgEl('text', { x: -nav.hw + 12, y: 14, class: 't-info' }, drawer);
+    dTitle.textContent = '💾 caché del navegador';
+    const hdr = svgEl('text', { x: M ? 20 : 60, y: M ? 420 : 470, class: 'hdr' }, svg);
+    const upd = hstats(slide, [['sent', 'Salieron'], ['fromCache', 'Desde caché'], ['kb', 'Bajado']]);
+
+    const draw = () => {
+      if (!copy) dAge.textContent = 'vacía';
+      else {
+        const age = Math.floor(clock.now - copy.at), fresh = age < copy.maxAge;
+        dAge.textContent = `app.js · edad ${age} s / max-age ${copy.maxAge} → ${fresh ? 'fresca' : 'vencida'}`;
+        dAge.setAttribute('class', 't-info ' + (fresh ? 'fresh' : 'stale'));
+      }
+      upd({ sent, fromCache, kb: fmtKB(kb) });
+    };
+    clock.onTick = draw;
+
+    const get = () => {
+      if (copy && clock.now - copy.at < copy.maxAge) {
+        fromCache++;
+        pop(gp, nav.x, nav.y - nav.hh - 8, 'desde caché · 0 ms', PINK);
+        draw();
+        return;
+      }
+      sent++;
+      const ma = maxAge;
+      fly(clock, gp, nav, srv, M, REQ, () => {
+        fly(clock, gp, srv, nav, M, GREEN, () => {
+          copy = { at: clock.now, maxAge: ma };
+          kb += 180;
+          hdr.textContent = `200 OK · 180 KB · Cache-Control: max-age=${ma}`;
+          draw();
+        }, 9);
+      });
+      draw();
+    };
+
+    seg(slide, 'maxage', v => { maxAge = +v; });
+    on(slide, '[data-act=get]', get);
+    slide.querySelector('input[data-opt=auto]').addEventListener('change', e => {
+      if (auto) auto.cancel();
+      auto = e.target.checked ? clock.every(4, get) : null;
+    });
+    draw();
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ sent, fromCache, age: copy ? clock.now - copy.at : null }) };
+  };
+
+  /* ---------- 12. validación con ETag ---------- */
+
+  S.etag = slide => {
+    const { svg, clock, M } = manual(slide, 'httpc');
+    const W = NetKit.W;
+    let useEtag = false, version = 1, copy = null, r200 = 0, r304 = 0, kb = 0;
+    const nav = M ? { x: W / 2, y: 80, hw: 120, hh: 46 } : { x: 190, y: 250, hw: 130, hh: 40 };
+    const srv = M ? { x: W / 2, y: 330, hw: 110, hh: 34 } : { x: 700, y: 250, hw: 110, hh: 40 };
+    const gl = svgEl('g', {}, svg), gn = svgEl('g', {}, svg), gp = svgEl('g', {}, svg);
+    link(gl, nav, srv, M);
+    nbox(gn, nav, 'Navegador', '💻', 'client');
+    nav.g.style.setProperty('--c', REQ);
+    nbox(gn, srv, 'tienda.com', '🖥');
+    const req = svgEl('text', { x: M ? 20 : 60, y: M ? 400 : 440, class: 'hdr' }, svg);
+    const res = svgEl('text', { x: M ? 20 : 60, y: M ? 425 : 470, class: 'hdr' }, svg);
+    const upd = hstats(slide, [['r200', '200 OK'], ['r304', '304'], ['kb', 'Bajado']]);
+    const draw = () => {
+      nav.sub.textContent = copy ? `copia vencida · ETag "v${copy.v}"` : 'sin copia';
+      srv.sub.textContent = `app.js versión "v${version}"`;
+      upd({ r200, r304, kb: fmtKB(kb) });
+    };
+
+    const get = () => {
+      const cond = useEtag && copy;
+      req.textContent = 'GET /static/app.js' + (cond ? `  ·  If-None-Match: "v${copy.v}"` : '');
+      fly(clock, gp, nav, srv, M, REQ, () => {
+        if (cond && copy.v === version) {
+          r304++; kb += 0.3;
+          res.textContent = '304 Not Modified · sin cuerpo · 0,3 KB';
+          fly(clock, gp, srv, nav, M, PINK, () => { pop(gp, nav.x, nav.y - nav.hh - 8, '304: usá la tuya', PINK); draw(); }, 4);
+        } else {
+          r200++; kb += 180;
+          res.textContent = `200 OK · 180 KB` + (useEtag ? ` · ETag: "v${version}"` : '');
+          const v = version;
+          fly(clock, gp, srv, nav, M, GREEN, () => { copy = { v }; draw(); }, 10);
+        }
+        draw();
+      });
+    };
+
+    seg(slide, 'etag', v => { useEtag = v === 'on'; copy = null; showModeIn(slide, v); draw(); });
+    on(slide, '[data-act=get]', get);
+    on(slide, '[data-act=change]', () => { version++; pop(gp, srv.x, srv.y - srv.hh - 8, `nueva versión v${version}`, '#fb923c'); draw(); });
+    draw();
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ r200, r304, bytes: kb }) };
+  };
+
+  /* ---------- 13. caché privada o compartida ---------- */
+
+  S.privada = slide => {
+    const { svg, clock, M } = manual(slide, 'httpc');
+    const W = NetKit.W;
+    const USERS = { ana: { name: 'Ana', emoji: '👩', color: '#38bdf8' }, beto: { name: 'Beto', emoji: '👨', color: '#a3e635' } };
+    let cc = 'public', shared = null, leaks = 0;
+    const own = { ana: null, beto: null };
+    const U = M
+      ? { ana: { x: 100, y: 50, hw: 80, hh: 30 }, beto: { x: 300, y: 50, hw: 80, hh: 30 } }
+      : { ana: { x: 120, y: 160, hw: 90, hh: 40 }, beto: { x: 120, y: 420, hw: 90, hh: 40 } };
+    const px = M ? { x: W / 2, y: 210, hw: 120, hh: 36 } : { x: 440, y: 290, hw: 120, hh: 44 };
+    const org = M ? { x: W / 2, y: 370, hw: 110, hh: 32 } : { x: 760, y: 290, hw: 100, hh: 40 };
+    const gl = svgEl('g', {}, svg), gn = svgEl('g', {}, svg), gp = svgEl('g', {}, svg);
+    Object.values(U).forEach(u => link(gl, u, px, M));
+    link(gl, px, org, M);
+    Object.entries(U).forEach(([k, u]) => { nbox(gn, u, USERS[k].name, USERS[k].emoji, 'client'); u.g.style.setProperty('--c', USERS[k].color); });
+    nbox(gn, px, 'Caché compartida', '🗃', 'redis');
+    nbox(gn, org, 'tienda.com', '🖥');
+    org.sub.textContent = '/mi-cuenta';
+    const upd = hstats(slide, [['leaks', 'Datos ajenos'], ['origin', 'Al origen']]);
+    let origin = 0;
+    const draw = () => {
+      px.sub.textContent = shared ? `guarda /mi-cuenta (de ${USERS[shared].name})` : 'vacía';
+      Object.entries(U).forEach(([k, u]) => { u.sub.textContent = own[k] ? `su copia: de ${USERS[own[k]].name}` : 'sin copia'; });
+      upd({ leaks, origin });
+    };
+
+    const ask = who => {
+      const u = U[who];
+      if (cc === 'private' && own[who]) { pop(gp, u.x, u.y - u.hh - 8, 'desde su navegador', PINK); return; }
+      fly(clock, gp, u, px, M, USERS[who].color, () => {
+        if (cc === 'public' && shared) {
+          const owner = shared;
+          fly(clock, gp, px, u, M, USERS[owner].color, () => {
+            own[who] = owner;
+            if (owner !== who) { leaks++; pop(gp, u.x, u.y - u.hh - 8, '¡datos de otro!', RED); }
+            draw();
+          }, 8);
+          return;
+        }
+        fly(clock, gp, px, org, M, USERS[who].color, () => {
+          origin++;
+          fly(clock, gp, org, px, M, USERS[who].color, () => {
+            if (cc === 'public') shared = who;
+            fly(clock, gp, px, u, M, USERS[who].color, () => { if (cc !== 'no-store') own[who] = who; draw(); }, 8);
+            draw();
+          }, 8);
+        });
+      });
+    };
+
+    seg(slide, 'cc', v => { cc = v; shared = null; own.ana = own.beto = null; leaks = 0; origin = 0; showModeIn(slide, v); draw(); });
+    on(slide, '[data-act=ana]', () => ask('ana'));
+    on(slide, '[data-act=beto]', () => ask('beto'));
+    draw();
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ leaks, origin }) };
+  };
+
   window.Scenes = S;
 })();

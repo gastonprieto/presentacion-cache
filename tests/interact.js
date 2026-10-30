@@ -424,6 +424,62 @@ test('escena donde: local deja réplicas con precio viejo', async page => {
   check(r.shared === 0, `stale compartida=${r.shared}`);
 });
 
+/* ---------- escenas: caché HTTP ---------- */
+
+Object.assign(SL, { http: 11, etag: 12, privada: 13 });
+
+test('escena http: max-age 60 evita el segundo pedido', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.http, sec => {
+    sec.querySelector('.seg[data-group=maxage] [data-v="60"]').click();
+    sec.querySelector('[data-act=get]').click(); sec._scene.ff(3);
+    sec.querySelector('[data-act=get]').click(); sec._scene.ff(3);
+    return sec._scene.state();
+  });
+  check(st.sent === 1 && st.fromCache === 1, JSON.stringify(st));
+});
+
+test('escena http: max-age 0 siempre sale', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.http, sec => {
+    sec.querySelector('.seg[data-group=maxage] [data-v="0"]').click();
+    for (let i = 0; i < 3; i++) { sec.querySelector('[data-act=get]').click(); sec._scene.ff(3); }
+    return sec._scene.state();
+  });
+  check(st.sent === 3 && st.fromCache === 0, JSON.stringify(st));
+});
+
+test('escena etag: 304 sin cambio y 200 con cambio', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.etag, sec => {
+    sec.querySelector('.seg[data-group=etag] [data-v=on]').click();
+    const get = () => { sec.querySelector('[data-act=get]').click(); sec._scene.ff(3); };
+    get(); get(); get();
+    const a = sec._scene.state();
+    sec.querySelector('[data-act=change]').click();
+    get();
+    const b = sec._scene.state();
+    return { a, b };
+  });
+  check(r.a.r304 === 2 && r.a.r200 === 1, JSON.stringify(r.a));
+  check(r.b.r200 === 2 && r.b.r304 === 2, JSON.stringify(r.b));
+  check(r.a.bytes < 200, `KB=${r.a.bytes}`);
+});
+
+test('escena privada: public filtra, private no', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.privada, sec => {
+    const run = mode => {
+      sec.querySelector(`.seg[data-group=cc] [data-v=${mode}]`).click();
+      ['ana', 'beto', 'ana', 'beto'].forEach(u => { sec.querySelector(`[data-act=${u}]`).click(); sec._scene.ff(3); });
+      return sec._scene.state().leaks;
+    };
+    return { pub: run('public'), priv: run('private'), nostore: run('no-store') };
+  });
+  check(r.pub > 0, `public leaks=${r.pub}`);
+  check(r.priv === 0 && r.nostore === 0, JSON.stringify(r));
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

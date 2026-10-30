@@ -404,3 +404,12 @@ html.mobile .evict .slot-key { font-size: 32px; }
 html.mobile .evict .evict-count { font-size: 15px; }
 b.amber { color: #d97706; }
 .field small { color: var(--muted); font-size: 12px; }
+
+/* ---------- caché HTTP ---------- */
+.httpc .drawer { fill: #1a0f1c; stroke: #f472b6; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.httpc .t-info.fresh { fill: #f472b6; }
+.httpc .t-info.stale { fill: var(--muted); }
+.httpc .hdr { fill: #cbd5e1; font: 600 15px var(--mono); }
+.btn.ana { border-color: #38bdf8; }
+.btn.beto { border-color: #a3e635; }
+html.mobile .httpc .hdr { font-size: 11px; }
