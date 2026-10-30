@@ -60,8 +60,9 @@ docker compose exec redis redis-cli TTL producto:42      # segundos que le queda
 **Invalidación.** Cambiar el precio sin avisar a la caché sigue mostrando el viejo hasta el TTL. Con `invalidar=1`, el servicio borra la clave y el próximo pedido trae el nuevo (para que sea el comportamiento por defecto: `INVALIDAR: "1"` en el compose).
 
 ```bash
+curl -s localhost:8081/productos/42                       # la deja en la caché
 curl -s -X PUT "localhost:8081/productos/42/precio?valor=5000"
-curl -s localhost:8081/productos/42                       # precio viejo (HIT)
+curl -s localhost:8081/productos/42                       # precio viejo (HIT), hasta que venza
 curl -s -X PUT "localhost:8081/productos/42/precio?valor=6000&invalidar=1"
 curl -s -D - localhost:8081/productos/42 | grep -iE "x-cache|precio"   # MISS con el precio nuevo
 ```
@@ -112,7 +113,7 @@ curl -s -H 'X-Usuario: beto' localhost:8080/mi-cuenta-mal    # Cuenta de ana (!)
 ```bash
 docker compose exec db psql -U postgres -d tienda
 \timing on
-SELECT fecha, count(*), sum(total) FROM ordenes GROUP BY fecha ORDER BY fecha DESC LIMIT 3;   -- decenas de ms
+SELECT fecha, count(*), sum(total) FROM ordenes GROUP BY fecha ORDER BY fecha DESC LIMIT 3;   -- 100 a 300 ms: recorre 2 millones de filas
 SELECT * FROM ventas_por_dia ORDER BY fecha DESC LIMIT 3;                                    -- < 1 ms
 REFRESH MATERIALIZED VIEW mv_ventas_por_dia;
 SELECT * FROM mv_ventas_por_dia ORDER BY fecha DESC LIMIT 3;

@@ -161,7 +161,7 @@
   </div>
   <aside class="notes">
     Tres perillas: cuánto entra en la caché, cuántos productos distintos se piden y cómo se reparten los pedidos. "Pocos populares" es lo realista (ley de potencia: el 20% de los productos recibe la mayoría de las visitas). "Todos parejos" es el peor caso.
-    Mostrar: con 10 lugares y pocos populares el hit rate ronda 70%; pasar a "todos parejos" y cae a ~20%. Subir los lugares a 40 y vuelve a subir. Cada cambio de lugar empieza con la caché vacía: se ve cómo se llena.
+    Mostrar: con 10 lugares y pocos populares el hit rate ronda 50–55%; pasar a "todos parejos" y cae a ~20%. Subir los lugares a 40: ~80% con pocos populares, ~70% con todos parejos. Cada cambio de lugar empieza con la caché vacía: se ve cómo se llena.
     El hit rate no se adivina: se mide (Redis lo informa con INFO stats).
     Pregunta para la clase: ¿qué tienen más parecido a "pocos populares": los productos de una tienda o los movimientos de cada cuenta de un banco?
   </aside>
@@ -200,7 +200,7 @@
     Una caché siempre tiene lugar limitado (memoria). Cuando se llena, alguien tiene que salir: eso decide el algoritmo de reemplazo (eviction).
     Patrón "populares + un recorrido": A, B y C se piden todo el tiempo, y en el medio alguien recorre D…I una sola vez (un reporte, un bot que indexa el catálogo). LRU y FIFO sacan a los populares para hacerle lugar a cosas que no se vuelven a pedir; LFU los protege porque cuentan muchos pedidos.
     Patrón "cambia la moda": A–D estuvieron de moda y ahora se piden E–H. LFU se aferra a los viejos (tienen muchos pedidos acumulados) y los nuevos se pisan entre ellos: LRU gana.
-    Ningún algoritmo gana siempre: depende del patrón de acceso. En la práctica: LRU por defecto (Redis allkeys-lru), LFU cuando hay populares estables y recorridos que ensucian.
+    Ningún algoritmo gana siempre: depende del patrón de acceso. En la práctica: LRU como punto de partida (en Redis, configurando maxmemory-policy allkeys-lru; por defecto Redis no saca nada y rechaza escrituras: noeviction), LFU cuando hay populares estables y recorridos que ensucian.
     Pregunta para la clase: ¿qué patrón se parece más a una tienda en Black Friday?
   </aside>
 </section>
@@ -467,7 +467,7 @@
     </div>
   </div>
   <aside class="notes">
-    Sin CDN, cada usuario va hasta el origen en Nueva York: ~40 ms desde Nueva York, ~300 ms desde Sídney, por pedido y por cada archivo de la página. No es un problema de la DB ni del servidor: es la velocidad de la luz en la fibra.
+    Sin CDN, cada usuario va hasta el origen en Nueva York: ~70 ms desde Nueva York, ~300 ms desde Sídney, por pedido y por cada archivo de la página. No es un problema de la DB ni del servidor: es la velocidad de la luz en la fibra.
     Prender la CDN: aparecen nodos de borde (puntos de presencia) cerca de cada región. El primer pedido de cada región es un miss y va al origen; después se responde en el borde. Las barras de latencia se achican y el origen casi no recibe pedidos.
     "Sólo desde Sídney" con la CDN recién prendida muestra el calentamiento de una región.
     Es una caché HTTP compartida (public), distribuida geográficamente: respeta los mismos headers que vimos (max-age, ETag).

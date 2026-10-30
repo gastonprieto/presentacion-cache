@@ -573,6 +573,46 @@ test('escena alescribir: falla desincroniza', async page => {
   check(r.bad.total < r.bad.trueTotal && r.bad.failures > 0, JSON.stringify(r.bad));
 });
 
+/* ---------- revisión final: estado en vuelo al cambiar de modo ---------- */
+
+test('privada: una respuesta en vuelo no cuenta en el modo nuevo', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.privada, sec => {
+    const sc = sec._scene, mode = v => sec.querySelector(`.seg[data-group=cc] [data-v=${v}]`).click();
+    mode('public');
+    sec.querySelector('[data-act=ana]').click(); sc.ff(3);
+    sec.querySelector('[data-act=beto]').click(); sc.ff(0.7);
+    mode('private'); sc.ff(4);
+    return sc.state();
+  });
+  check(st.leaks === 0, JSON.stringify(st));
+});
+
+test('etag: cambiar de modo reinicia los contadores', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.etag, sec => {
+    const sc = sec._scene;
+    sec.querySelector('.seg[data-group=etag] [data-v=on]').click();
+    for (let i = 0; i < 2; i++) { sec.querySelector('[data-act=get]').click(); sc.ff(3); }
+    sec.querySelector('.seg[data-group=etag] [data-v=off]').click();
+    return sc.state();
+  });
+  check(st.r200 === 0 && st.r304 === 0 && st.bytes === 0, JSON.stringify(st));
+});
+
+test('job: un panel en vuelo no se mezcla al cambiar de modo', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.job, sec => {
+    const sc = sec._scene;
+    sec.querySelector('.seg[data-group=mode] [data-v=ondemand]').click();
+    sc.ff(2);
+    sec.querySelector('[data-act=panel]').click(); sc.ff(0.3);
+    sec.querySelector('.seg[data-group=mode] [data-v=job]').click(); sc.ff(4);
+    return sc.state();
+  });
+  check(st.panelMs === null && st.dataAge === null, JSON.stringify(st));
+});
+
 /* ---------- recorrido completo ---------- */
 
 test('escenas: stop/start sin errores', async (page, errors) => {

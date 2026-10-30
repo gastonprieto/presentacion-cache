@@ -422,7 +422,7 @@
     const res = svgEl('text', { x: M ? 20 : 60, y: M ? 425 : 470, class: 'hdr' }, svg);
     const upd = hstats(slide, [['r200', '200 OK'], ['r304', '304'], ['kb', 'Bajado']]);
     const draw = () => {
-      nav.sub.textContent = copy ? `copia vencida · ETag "v${copy.v}"` : 'sin copia';
+      nav.sub.textContent = !copy ? 'sin copia' : useEtag ? `copia vencida · ETag "v${copy.v}"` : 'copia vencida';
       srv.sub.textContent = `app.js versión "v${version}"`;
       upd({ r200, r304, kb: fmtKB(kb) });
     };
@@ -445,7 +445,10 @@
       });
     };
 
-    seg(slide, 'etag', v => { useEtag = v === 'on'; copy = null; showModeIn(slide, v); draw(); });
+    seg(slide, 'etag', v => {
+      clock.clear(); gp.innerHTML = ''; req.textContent = res.textContent = '';
+      useEtag = v === 'on'; copy = null; r200 = r304 = kb = 0; showModeIn(slide, v); draw();
+    });
     on(slide, '[data-act=get]', get);
     on(slide, '[data-act=change]', () => { version++; pop(gp, srv.x, srv.y - srv.hh - 8, `nueva versión v${version}`, '#fb923c'); draw(); });
     draw();
@@ -504,7 +507,7 @@
       });
     };
 
-    seg(slide, 'cc', v => { cc = v; shared = null; own.ana = own.beto = null; leaks = 0; origin = 0; showModeIn(slide, v); draw(); });
+    seg(slide, 'cc', v => { clock.clear(); gp.innerHTML = ''; cc = v; shared = null; own.ana = own.beto = null; leaks = 0; origin = 0; showModeIn(slide, v); draw(); });
     on(slide, '[data-act=ana]', () => ask('ana'));
     on(slide, '[data-act=beto]', () => ask('beto'));
     draw();
@@ -719,7 +722,7 @@
     const ORANGE = '#fb923c', TEAL = '#2dd4bf';
     const PER_ORDER = 0.002, RATE = 20;
     let mode = 'ondemand', every = 10, orders = 500, lastRunAt = null, jobRuns = 0, jobCostSec = 0;
-    let panelMs = null, dataAge = null, busy = false, jobTimer = null, running = false;
+    let panelMs = null, dataAge = null, busy = false, jobTimer = null, running = false, gen = 0;
     const N = M
       ? { src: { x: 110, y: 40, hw: 80, hh: 24 }, ord: { x: 110, y: 140, hw: 90, hh: 32 }, job: { x: 110, y: 260, hw: 90, hh: 32 }, agg: { x: 110, y: 380, hw: 90, hh: 30 }, pan: { x: 300, y: 260, hw: 88, hh: 34 } }
       : { src: { x: 110, y: 120, hw: 80, hh: 28 }, ord: { x: 400, y: 120, hw: 110, hh: 40 }, job: { x: 400, y: 300, hw: 110, hh: 40 }, agg: { x: 400, y: 470, hw: 110, hh: 36 }, pan: { x: 740, y: 300, hw: 120, hh: 44 } };
@@ -757,28 +760,32 @@
     };
     clock.onTick = draw;
 
-    const progress = (el, n, dur, done) => clock.animate(dur, p => el.setAttribute('width', (n.hw * 2 - 20) * p), () => { el.setAttribute('width', 0); done(); });
+    const progress = (el, n, dur, done) => {
+      const g = gen;
+      clock.animate(dur, p => { if (g === gen) el.setAttribute('width', (n.hw * 2 - 20) * p); }, () => { if (g === gen) { el.setAttribute('width', 0); done(); } });
+    };
 
     const runJob = () => {
       if (running || mode !== 'job') return;
       running = true;
-      const snapshotAt = clock.now, dur = orders * PER_ORDER;
+      const g = gen, snapshotAt = clock.now, dur = orders * PER_ORDER;
       fly(clock, gp, N.ord, N.job, M, TEAL, null, 4, 0.3);
       progress(jobBar, N.job, dur, () => {
-        if (mode !== 'job') { running = false; return; }
+        if (g !== gen) return;
         jobRuns++; jobCostSec += dur;
-        fly(clock, gp, N.job, N.agg, M, TEAL, () => { lastRunAt = snapshotAt; running = false; pop(gp, N.agg.x, N.agg.y - N.agg.hh - 8, '✔ actualizada', TEAL); draw(); }, 6, 0.3);
+        fly(clock, gp, N.job, N.agg, M, TEAL, () => { if (g !== gen) return; lastRunAt = snapshotAt; running = false; pop(gp, N.agg.x, N.agg.y - N.agg.hh - 8, '✔ actualizada', TEAL); draw(); }, 6, 0.3);
       });
     };
 
     const openPanel = () => {
       if (busy) return;
       busy = true;
-      const t0 = clock.now, jobOn = mode === 'job';
+      const g = gen, t0 = clock.now, jobOn = mode === 'job';
       const target = jobOn ? N.agg : N.ord;
       const work = jobOn ? 0.05 : 0.2 + orders * PER_ORDER;
       fly(clock, gp, N.pan, target, M, REQ, () => progress(panBar, N.pan, work, () => {
         fly(clock, gp, target, N.pan, M, jobOn ? TEAL : GREEN, () => {
+          if (g !== gen) return;
           busy = false;
           panelMs = Math.round(work * 1000);
           dataAge = jobOn ? (lastRunAt == null ? null : t0 - lastRunAt) : 0;
@@ -798,6 +805,7 @@
     seg(slide, 'mode', v => {
       mode = v; showModeIn(slide, v);
       slide.querySelector('.job-only').hidden = v !== 'job';
+      gen++; busy = running = false; panBar.setAttribute('width', 0); jobBar.setAttribute('width', 0);
       panelMs = dataAge = null; lastRunAt = null; jobRuns = 0; jobCostSec = 0;
       restartJob(); draw();
     });
