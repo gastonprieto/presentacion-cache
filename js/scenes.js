@@ -469,63 +469,101 @@
     return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ r200, r304, bytes: kb }) };
   };
 
-  /* ---------- 13. caché privada o compartida ---------- */
+  /* ---------- 14. caché privada o compartida ---------- */
 
   S.privada = slide => {
     const { svg, clock, M } = manual(slide, 'httpc');
     const W = NetKit.W;
     const USERS = { ana: { name: 'Ana', emoji: '👩', color: '#38bdf8' }, beto: { name: 'Beto', emoji: '👨', color: '#a3e635' } };
-    let cc = 'public', shared = null, leaks = 0;
-    const own = { ana: null, beto: null };
+    const LOGO = '#e2e8f0';
+    let cc = 'public', path = '/perfil', shared, browser, leaks, origin, browserHits, sharedHits;
     const U = M
-      ? { ana: { x: 100, y: 50, hw: 80, hh: 30 }, beto: { x: 300, y: 50, hw: 80, hh: 30 } }
-      : { ana: { x: 120, y: 160, hw: 90, hh: 40 }, beto: { x: 120, y: 420, hw: 90, hh: 40 } };
-    const px = M ? { x: W / 2, y: 210, hw: 120, hh: 36 } : { x: 440, y: 290, hw: 120, hh: 44 };
-    const org = M ? { x: W / 2, y: 370, hw: 110, hh: 32 } : { x: 760, y: 290, hw: 100, hh: 40 };
+      ? { ana: { x: 100, y: 40, hw: 80, hh: 24 }, beto: { x: 300, y: 40, hw: 80, hh: 24 } }
+      : { ana: { x: 130, y: 120, hw: 100, hh: 34 }, beto: { x: 130, y: 380, hw: 100, hh: 34 } };
+    const px = M ? { x: W / 2, y: 225, hw: 120, hh: 28 } : { x: 455, y: 250, hw: 125, hh: 36 };
+    const org = M ? { x: W / 2, y: 400, hw: 100, hh: 26 } : { x: 775, y: 250, hw: 90, hh: 36 };
     const gl = svgEl('g', {}, svg), gn = svgEl('g', {}, svg), gp = svgEl('g', {}, svg);
     Object.values(U).forEach(u => link(gl, u, px, M));
     link(gl, px, org, M);
-    Object.entries(U).forEach(([k, u]) => { nbox(gn, u, USERS[k].name, USERS[k].emoji, 'client'); u.g.style.setProperty('--c', USERS[k].color); });
+    Object.entries(U).forEach(([k, u]) => { nbox(gn, u, USERS[k].name, USERS[k].emoji, 'client'); u.g.style.setProperty('--c', USERS[k].color); u.sub.textContent = 'navegador'; });
     nbox(gn, px, 'Caché compartida', '🗃', 'redis');
+    px.sub.textContent = 'proxy / CDN · clave = URL';
     nbox(gn, org, 'tienda.com', '🖥');
-    org.sub.textContent = '/perfil';
-    const upd = hstats(slide, [['leaks', 'Datos ajenos'], ['origin', 'Al origen']]);
-    let origin = 0;
+    org.sub.textContent = 'origen';
+
+    // Tabla de una caché: una fila por URL guardada, con de quién es la copia
+    const table = (n, title, below) => {
+      const w = M ? 170 : 240, rowH = M ? 13 : 17;
+      const g = svgEl('g', { class: 'ctable', transform: `translate(${n.x - w / 2},${below})` }, gn);
+      svgEl('rect', { class: 'ct-box', width: w, height: rowH * 3 + 6, rx: 7 }, g);
+      svgEl('text', { x: 8, y: rowH, class: 'ct-title' }, g).textContent = title;
+      const rows = [svgEl('text', { x: 8, y: rowH * 2 + 1, class: 'ct-row' }, g), svgEl('text', { x: 8, y: rowH * 3 + 1, class: 'ct-row' }, g)];
+      return { rows, w };
+    };
+    const tUsers = M
+      ? { ana: table(U.ana, '💾 su navegador', U.ana.y + U.ana.hh + 6), beto: table(U.beto, '💾 su navegador', U.beto.y + U.beto.hh + 6) }
+      : { ana: table(U.ana, '💾 caché del navegador', U.ana.y + U.ana.hh + 8), beto: table(U.beto, '💾 caché del navegador', U.beto.y + U.beto.hh + 8) };
+    const tShared = table(px, '🗃 guarda (por URL)', px.y + px.hh + 8);
+    const upd = hstats(slide, [['leaks', 'Datos ajenos'], ['origin', 'Al origen'], ['browserHits', 'Del navegador'], ['sharedHits', 'De la compartida']]);
+    const owner = (p, o) => (p === '/logo.png' ? 'igual para todos' : `de ${USERS[o].name}`);
+    const fill = (t, entries) => t.rows.forEach((r, i) => {
+      const e = entries[i];
+      r.textContent = e ? `GET ${e[0]} → ${owner(e[0], e[1])}` : '';
+      r.setAttribute('class', 'ct-row' + (e && e[0] === '/perfil' ? ` own-${e[1]}` : ''));
+    });
+
     const draw = () => {
-      px.sub.textContent = shared ? `guarda /perfil (de ${USERS[shared].name})` : 'vacía';
-      Object.entries(U).forEach(([k, u]) => { u.sub.textContent = own[k] ? `su copia: de ${USERS[own[k]].name}` : 'sin copia'; });
-      upd({ leaks, origin });
+      fill(tShared, Object.entries(shared));
+      Object.keys(U).forEach(k => fill(tUsers[k], Object.entries(browser[k])));
+      upd({ leaks, origin, browserHits, sharedHits });
+    };
+    const reset = () => {
+      clock.clear(); gp.innerHTML = '';
+      shared = {}; browser = { ana: {}, beto: {} };
+      leaks = origin = browserHits = sharedHits = 0;
+      draw();
     };
 
     const ask = who => {
-      const u = U[who];
-      if (cc === 'private' && own[who]) { pop(gp, u.x, u.y - u.hh - 8, 'desde su navegador', PINK); return; }
+      const u = U[who], p = path, rule = p === '/logo.png' ? 'public' : cc;
+      const color = o => (p === '/logo.png' ? LOGO : USERS[o].color);
+      if (rule !== 'no-store' && browser[who][p]) {
+        browserHits++;
+        pop(gp, u.x, u.y - u.hh - 8, 'desde su navegador', PINK);
+        draw();
+        return;
+      }
       fly(clock, gp, u, px, M, USERS[who].color, () => {
-        if (cc === 'public' && shared) {
-          const owner = shared;
-          fly(clock, gp, px, u, M, USERS[owner].color, () => {
-            own[who] = owner;
-            if (owner !== who) { leaks++; pop(gp, u.x, u.y - u.hh - 8, '¡datos de otro!', RED); }
+        if (shared[p]) {
+          const o = shared[p];
+          sharedHits++;
+          fly(clock, gp, px, u, M, color(o), () => {
+            if (rule !== 'no-store') browser[who][p] = o;
+            if (p === '/perfil' && o !== who) { leaks++; pop(gp, u.x, u.y - u.hh - 8, `¡el perfil de ${USERS[o].name}!`, RED); }
+            else pop(gp, u.x, u.y - u.hh - 8, 'copia compartida', PINK);
             draw();
           }, 8);
+          draw();
           return;
         }
         fly(clock, gp, px, org, M, USERS[who].color, () => {
           origin++;
-          fly(clock, gp, org, px, M, USERS[who].color, () => {
-            if (cc === 'public') shared = who;
-            fly(clock, gp, px, u, M, USERS[who].color, () => { if (cc !== 'no-store') own[who] = who; draw(); }, 8);
+          fly(clock, gp, org, px, M, color(who), () => {
+            if (rule === 'public') { shared[p] = who; pop(gp, px.x, px.y - px.hh - 8, `guarda ${p}`, PINK); }
+            fly(clock, gp, px, u, M, color(who), () => { if (rule !== 'no-store') browser[who][p] = who; draw(); }, 8);
             draw();
           }, 8);
+          draw();
         });
       });
     };
 
-    seg(slide, 'cc', v => { clock.clear(); gp.innerHTML = ''; cc = v; shared = null; own.ana = own.beto = null; leaks = 0; origin = 0; showModeIn(slide, v); draw(); });
+    seg(slide, 'cc', v => { cc = v; showModeIn(slide, v); reset(); });
+    seg(slide, 'path', v => { path = v; });
     on(slide, '[data-act=ana]', () => ask('ana'));
     on(slide, '[data-act=beto]', () => ask('beto'));
-    draw();
-    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ leaks, origin }) };
+    reset();
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ leaks, origin, browserHits, sharedHits }) };
   };
 
   /* ---------- 14–15. CDN: mapa estilizado ---------- */

@@ -476,3 +476,10 @@ html.mobile pre.sql { font-size: 11px; }
 .netsim .kchip.stale rect { fill: #3a2408; stroke: #d97706; stroke-dasharray: 3 2; }
 .netsim .kchip.stale text { fill: #fbbf24; }
 html.mobile .netsim .kchip text { font-size: 7px; }
+.httpc .ctable .ct-box { fill: #0b1228; stroke: #3b4b7a; stroke-width: 1.2; }
+.httpc .ctable .ct-title { fill: var(--muted); font: 600 12px var(--sans); }
+.httpc .ctable .ct-row { fill: #e2e8f0; font: 600 12px var(--mono); }
+.httpc .ctable .ct-row.own-ana { fill: #38bdf8; }
+.httpc .ctable .ct-row.own-beto { fill: #a3e635; }
+.cc-label { margin: 2px 0 -4px; font-size: 13px; color: var(--muted); }
+html.mobile .httpc .ctable .ct-title, html.mobile .httpc .ctable .ct-row { font-size: 9px; }

@@ -471,7 +471,7 @@ test('escena privada: public filtra, private no', async page => {
   const r = await evalScene(page, SL.privada, sec => {
     const run = mode => {
       sec.querySelector(`.seg[data-group=cc] [data-v=${mode}]`).click();
-      ['ana', 'beto', 'ana', 'beto'].forEach(u => { sec.querySelector(`[data-act=${u}]`).click(); sec._scene.ff(3); });
+      ['ana', 'beto', 'ana', 'beto'].forEach(u => { sec.querySelector(`[data-act=${u}]`).click(); sec._scene.ff(4.5); });
       return sec._scene.state().leaks;
     };
     return { pub: run('public'), priv: run('private'), nostore: run('no-store') };
@@ -632,6 +632,58 @@ test('escena donde: la caché externa muestra una sola tabla', async page => {
   check(n === 1, `tablas=${n}`);
 });
 
+/* ---------- privada o compartida: navegador, caché del camino y la URL como clave ---------- */
+
+const ASK = `(sec, who, path) => {
+  sec.querySelector('.seg[data-group=path] [data-v="' + path + '"]').click();
+  sec.querySelector('[data-act=' + who + ']').click();
+  sec._scene.ff(4.5);
+}`;
+
+test('privada: /logo.png se comparte y ahorra el viaje al origen', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.privada, `(sec, ASK) => {
+    const ask = eval(ASK);
+    ask(sec, 'ana', '/logo.png'); ask(sec, 'beto', '/logo.png');
+    return sec._scene.state();
+  }`, ASK);
+  check(st.origin === 1 && st.sharedHits === 1 && st.leaks === 0, JSON.stringify(st));
+});
+
+test('privada: private guarda sólo en el navegador', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.privada, `(sec, ASK) => {
+    const ask = eval(ASK);
+    sec.querySelector('.seg[data-group=cc] [data-v=private]').click();
+    ask(sec, 'ana', '/perfil'); ask(sec, 'ana', '/perfil'); ask(sec, 'beto', '/perfil');
+    return sec._scene.state();
+  }`, ASK);
+  check(st.origin === 2 && st.browserHits === 1 && st.sharedHits === 0 && st.leaks === 0, JSON.stringify(st));
+});
+
+test('privada: no-store no guarda en ningún lado', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.privada, `(sec, ASK) => {
+    const ask = eval(ASK);
+    sec.querySelector('.seg[data-group=cc] [data-v=no-store]').click();
+    ask(sec, 'ana', '/perfil'); ask(sec, 'ana', '/perfil');
+    return sec._scene.state();
+  }`, ASK);
+  check(st.origin === 2 && st.browserHits === 0, JSON.stringify(st));
+});
+
+test('privada: las tablas muestran qué guarda cada caché y de quién', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.privada, `(sec, ASK) => {
+    const ask = eval(ASK);
+    ask(sec, 'ana', '/perfil');
+    const t = [...sec.querySelectorAll('svg.sim .ctable')].map(x => x.textContent);
+    return t;
+  }`, ASK);
+  check(r.length === 3, `tablas=${r.length}`);
+  check(r.some(t => /\/perfil/.test(t) && /Ana/.test(t)), JSON.stringify(r));
+});
+
 /* ---------- revisión final: estado en vuelo al cambiar de modo ---------- */
 
 test('privada: una respuesta en vuelo no cuenta en el modo nuevo', async page => {
@@ -639,8 +691,8 @@ test('privada: una respuesta en vuelo no cuenta en el modo nuevo', async page =>
   const st = await evalScene(page, SL.privada, sec => {
     const sc = sec._scene, mode = v => sec.querySelector(`.seg[data-group=cc] [data-v=${v}]`).click();
     mode('public');
-    sec.querySelector('[data-act=ana]').click(); sc.ff(3);
-    sec.querySelector('[data-act=beto]').click(); sc.ff(0.7);
+    sec.querySelector('[data-act=ana]').click(); sc.ff(4.5);
+    sec.querySelector('[data-act=beto]').click(); sc.ff(1.2);
     mode('private'); sc.ff(4);
     return sc.state();
   });

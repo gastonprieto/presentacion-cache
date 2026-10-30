@@ -455,34 +455,36 @@
 
 <!-- ============ 14. PRIVADA O COMPARTIDA ============ -->
 <section data-scene="privada">
-  <div class="kicker red">Privada o compartida</div>
+  <div class="kicker pink">Privada o compartida</div>
   <h2>¿Quién puede guardar la respuesta?</h2>
   <div class="demo">
     <div class="stage"><svg class="sim"></svg></div>
     <div class="panel">
-      <p class="lead">En el medio hay una <b>caché compartida</b>: un proxy (servidor intermedio) que guarda respuestas <b>para todos</b>. Ana y Beto piden <code>/perfil</code>.</p>
+      <p class="lead">Una respuesta se puede guardar en <b>el navegador de cada uno</b> o en una <b>caché compartida del camino</b> (un proxy, una CDN), que usa <b>la URL como clave</b>. Lo decide el origen con <code>Cache-Control</code>.</p>
+      <div class="seg" data-group="path">
+        <button data-v="/perfil" class="active">Pedir /perfil</button><button data-v="/logo.png">Pedir /logo.png</button>
+      </div>
+      <div class="cc-label">Cache-Control de <code>/perfil</code> · <code>/logo.png</code> es siempre <code>public</code></div>
       <div class="seg" data-group="cc">
         <button data-v="public" class="active">public</button><button data-v="private">private</button><button data-v="no-store">no-store</button>
       </div>
-      <p class="mode-text" data-mode="public"><code>public</code>: cualquiera la puede guardar, también el proxy.</p>
-      <p class="mode-text" data-mode="private" hidden><code>private</code>: sólo el navegador de cada uno; el proxy no.</p>
+      <p class="mode-text" data-mode="public"><code>public</code>: también la guarda la caché compartida.</p>
+      <p class="mode-text" data-mode="private" hidden><code>private</code>: sólo el navegador de cada uno.</p>
       <p class="mode-text" data-mode="no-store" hidden><code>no-store</code>: nadie la guarda.</p>
       <div class="actions">
         <button class="btn ana" data-act="ana">👩 Ana pide</button>
         <button class="btn beto" data-act="beto">👨 Beto pide</button>
       </div>
       <div class="hstats"></div>
-      <ul class="points">
-        <li class="fragment">Lo personal: <code>private</code> (o <code>no-store</code> si es sensible).</li>
-        <li class="fragment">Lo igual para todos (catálogo, imágenes): <code>public</code>.</li>
-      </ul>
     </div>
   </div>
   <aside class="notes">
-    Con public: Ana pide /perfil, el proxy guarda la respuesta. Beto pide /perfil y el proxy le devuelve… la de Ana (punto del color de Ana y cartel rojo). Esto pasó de verdad en sitios grandes por un header mal puesto.
-    Con private: el proxy deja pasar; cada navegador guarda la suya. Con no-store: nadie guarda nada (datos bancarios, por ejemplo).
-    Lo mismo vale para una caché propia: la clave tiene que incluir al usuario si la respuesta depende del usuario.
-    Pregunta para la clase: ¿qué header le pondrían a la respuesta del carrito? ¿y a la foto de un producto?
+    Hay dos lugares donde se guarda una respuesta HTTP: el navegador de cada usuario (privado: sólo lo ve él) y las cachés compartidas en el camino (un proxy de la empresa, la CDN que vemos en un rato), que guardan una copia para todos y la buscan por URL.
+    Empezar con /logo.png: Ana lo pide, la caché compartida guarda la copia; Beto lo pide y se lo da la caché sin ir al origen. Eso es lo que queremos.
+    Pasar a /perfil con public: Ana lo pide y la caché compartida lo guarda bajo "/perfil". Beto pide "/perfil" —la misma URL— y recibe el perfil de Ana (cartel rojo). La caché no sabe de usuarios: sólo de URLs. Esto pasó de verdad en sitios grandes por un header mal puesto.
+    Con private: la caché compartida no guarda; cada navegador guarda el suyo (el segundo pedido de Ana sale de su navegador). Con no-store: nadie guarda nada (datos sensibles).
+    Quien decide es el origen, con Cache-Control. Detalles para mencionar: Vary hace que la clave incluya un header (por ejemplo Vary: Cookie), y las cachés compartidas por defecto no guardan respuestas a pedidos con Authorization.
+    Pregunta para la clase: ¿qué header le pondrían al carrito? ¿y a la foto de un producto?
   </aside>
 </section>
 
