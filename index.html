@@ -167,6 +167,44 @@
   </aside>
 </section>
 
+<!-- ============ 5. REEMPLAZO ============ -->
+<section data-scene="reemplazo">
+  <div class="kicker pink">Reemplazo</div>
+  <h2>Se llenó: ¿a quién saco?</h2>
+  <div class="demo">
+    <div class="stage"><svg class="sim"></svg></div>
+    <div class="panel">
+      <p class="lead">Caché de <b>4 lugares</b>. Cuando llega uno nuevo y está llena, el <b>algoritmo</b> elige a quién sacar.</p>
+      <div class="seg" data-group="policy">
+        <button data-v="lru" class="active">LRU</button><button data-v="lfu">LFU</button><button data-v="fifo">FIFO</button><button data-v="random">Random</button>
+      </div>
+      <p class="mode-text" data-mode="lru"><b>LRU</b>: saca la usada hace más tiempo.</p>
+      <p class="mode-text" data-mode="lfu" hidden><b>LFU</b>: saca la menos pedida.</p>
+      <p class="mode-text" data-mode="fifo" hidden><b>FIFO</b>: saca la que entró primero.</p>
+      <p class="mode-text" data-mode="random" hidden><b>Random</b>: saca una al azar.</p>
+      <div class="seg" data-group="pattern">
+        <button data-v="populares" class="active">Populares + un recorrido</button><button data-v="cambia">Cambia la moda</button>
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-act="play">⏸ Pausa</button>
+        <button class="btn" data-act="step">Paso ›</button>
+        <button class="btn ghost" data-act="reset">↺</button>
+      </div>
+      <table class="algo-table">
+        <tr><th>Hits con…</th><th>LRU</th><th>LFU</th><th>FIFO</th><th>Random</th></tr>
+        <tr><td class="algo-n"></td><td data-algo="lru"></td><td data-algo="lfu"></td><td data-algo="fifo"></td><td data-algo="random"></td></tr>
+      </table>
+    </div>
+  </div>
+  <aside class="notes">
+    Una caché siempre tiene lugar limitado (memoria). Cuando se llena, alguien tiene que salir: eso decide el algoritmo de reemplazo (eviction).
+    Patrón "populares + un recorrido": A, B y C se piden todo el tiempo, y en el medio alguien recorre D…I una sola vez (un reporte, un bot que indexa el catálogo). LRU y FIFO sacan a los populares para hacerle lugar a cosas que no se vuelven a pedir; LFU los protege porque cuentan muchos pedidos.
+    Patrón "cambia la moda": A–D estuvieron de moda y ahora se piden E–H. LFU se aferra a los viejos (tienen muchos pedidos acumulados) y los nuevos se pisan entre ellos: LRU gana.
+    Ningún algoritmo gana siempre: depende del patrón de acceso. En la práctica: LRU por defecto (Redis allkeys-lru), LFU cuando hay populares estables y recorridos que ensucian.
+    Pregunta para la clase: ¿qué patrón se parece más a una tienda en Black Friday?
+  </aside>
+</section>
+
 <!-- ============ 20. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>

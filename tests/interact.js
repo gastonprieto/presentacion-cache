@@ -309,6 +309,37 @@ test('escena hitrate: sliders cambian opciones', async page => {
   check(r.chart, 'falta canvas.cache-chart');
 });
 
+/* ---------- escena de reemplazo ---------- */
+
+SL.reemplazo = 5;
+
+test('escena reemplazo: tabla coincide con el modelo', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.reemplazo, sec => {
+    const cell = a => +sec.querySelector(`.algo-table [data-algo=${a}]`).textContent;
+    const pick = v => sec.querySelector(`.seg[data-group=pattern] [data-v=${v}]`).click();
+    pick('populares');
+    const pop = { lru: cell('lru'), lfu: cell('lfu'), fifo: cell('fifo') };
+    pick('cambia');
+    const cam = { lru: cell('lru'), lfu: cell('lfu') };
+    return { pop, cam };
+  });
+  check(r.pop.lru === 24 && r.pop.lfu === 27 && r.pop.fifo === 24, JSON.stringify(r.pop));
+  check(r.cam.lru === 32 && r.cam.lfu === 16, JSON.stringify(r.cam));
+});
+
+test('escena reemplazo: paso a paso', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.reemplazo, sec => {
+    sec.querySelector('.seg[data-group=policy] [data-v=lru]').click();
+    sec.querySelector('.seg[data-group=pattern] [data-v=populares]').click();
+    for (let i = 0; i < 3; i++) sec.querySelector('[data-act=step]').click();
+    return sec._scene.state();
+  });
+  check(st.misses === 3 && st.hits === 0, JSON.stringify(st));
+  check(JSON.stringify(st.slots) === JSON.stringify(['A', 'B', 'C']), JSON.stringify(st.slots));
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

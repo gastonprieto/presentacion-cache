@@ -381,3 +381,24 @@ html.mobile .ways { grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
 .reveal .ways-foot, .ways-foot { margin-top: 26px; font-size: 20px; color: #cbd5e1; text-align: left; }
 html.mobile .way { min-height: 0; }
 html.mobile .ways-foot { font-size: 15px; margin-top: 12px; }
+
+/* ---------- reemplazo ---------- */
+.evict .tape-cell rect { fill: #131c3a; stroke: #3b4b7a; stroke-width: 1.5; }
+.evict .tape-cell text { fill: #cbd5e1; font: 700 13px var(--mono); }
+.evict .tape-cell.done rect { fill: #0b1228; stroke: #1e293b; }
+.evict .tape-cell.done text { fill: #475569; }
+.evict .tape-cell.next rect { stroke: #7dd3fc; stroke-width: 2.5; }
+.evict .slot .node-box { fill: #1a0f1c; stroke: #f472b6; }
+.evict .slot.hit .node-box { fill: #4a1838; }
+.evict .slot.miss .node-box { stroke: #7dd3fc; fill: #0e2338; }
+.evict .slot-key { fill: #fff; font: 800 44px var(--sans); }
+.evict .evict-count { fill: #cbd5e1; font: 700 20px var(--mono); }
+.evict .pinkt { fill: #f472b6; }
+.algo-table { width: 100%; border-collapse: collapse; font: 14px var(--mono); }
+.algo-table th { color: var(--muted); font-weight: 600; text-align: center; padding: 4px; border-bottom: 1px solid var(--line); }
+.algo-table th:first-child, .algo-table td:first-child { text-align: left; }
+.algo-table td { text-align: center; padding: 6px 4px; color: #e2e8f0; font-weight: 700; font-size: 18px; }
+.algo-table td.algo-n { font-size: 13px; color: var(--muted); font-weight: 400; }
+.algo-table td.cur { color: #f472b6; background: rgba(244,114,182,.1); border-radius: 6px; }
+html.mobile .evict .slot-key { font-size: 32px; }
+html.mobile .evict .evict-count { font-size: 15px; }
