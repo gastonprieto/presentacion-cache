@@ -536,6 +536,43 @@ test('cdn: reset a mitad del deploy', async (page, errors) => {
   check(errors.length === 0, errors.join(' | '));
 });
 
+/* ---------- escenas: precálculo ---------- */
+
+Object.assign(SL, { job: 16, desnormalizar: 17, alescribir: 18, comparacion: 19, cierre: 20 });
+
+test('escena job: el job hace rápido el panel y deja dato viejo', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.job, sec => {
+    const sc = sec._scene, open = () => { sec.querySelector('[data-act=panel]').click(); sc.ff(4); return sc.state(); };
+    sec.querySelector('.seg[data-group=mode] [data-v=ondemand]').click();
+    sc.ff(2);
+    const early = open().panelMs;
+    sc.ff(20);
+    const late = open().panelMs;
+    sec.querySelector('.seg[data-group=mode] [data-v=job]').click();
+    sc.ff(15);
+    const j = open();
+    return { early, late, job: j };
+  });
+  check(r.late > r.early, `bajo demanda: ${r.early} → ${r.late}`);
+  check(r.job.panelMs < 100, `panel con job=${r.job.panelMs}`);
+  check(r.job.dataAge > 0 && r.job.jobRuns > 0, JSON.stringify(r.job));
+});
+
+test('escena alescribir: falla desincroniza', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.alescribir, sec => {
+    const sc = sec._scene;
+    const orders = n => { for (let i = 0; i < n; i++) { sec.querySelector('[data-act=order]').click(); sc.ff(1.5); } sc.ff(3); return sc.state(); };
+    const ok = orders(3);
+    sec.querySelector('input[data-opt=fail]').click();
+    const bad = orders(5);
+    return { ok, bad };
+  });
+  check(r.ok.total === r.ok.trueTotal, JSON.stringify(r.ok));
+  check(r.bad.total < r.bad.trueTotal && r.bad.failures > 0, JSON.stringify(r.bad));
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

@@ -712,5 +712,166 @@
     };
   };
 
+  /* ---------- 16. un job que deja todo listo ---------- */
+
+  S.job = slide => {
+    const { svg, clock, M } = manual(slide, 'pre');
+    const ORANGE = '#fb923c', TEAL = '#2dd4bf';
+    const PER_ORDER = 0.002, RATE = 20;
+    let mode = 'ondemand', every = 10, orders = 500, lastRunAt = null, jobRuns = 0, jobCostSec = 0;
+    let panelMs = null, dataAge = null, busy = false, jobTimer = null, running = false;
+    const N = M
+      ? { src: { x: 110, y: 40, hw: 80, hh: 24 }, ord: { x: 110, y: 140, hw: 90, hh: 32 }, job: { x: 110, y: 260, hw: 90, hh: 32 }, agg: { x: 110, y: 380, hw: 90, hh: 30 }, pan: { x: 300, y: 260, hw: 88, hh: 34 } }
+      : { src: { x: 110, y: 120, hw: 80, hh: 28 }, ord: { x: 400, y: 120, hw: 110, hh: 40 }, job: { x: 400, y: 300, hw: 110, hh: 40 }, agg: { x: 400, y: 470, hw: 110, hh: 36 }, pan: { x: 740, y: 300, hw: 120, hh: 44 } };
+    const gl = svgEl('g', {}, svg), gn = svgEl('g', {}, svg), gp = svgEl('g', {}, svg);
+    const lk = { panOrd: link(gl, N.pan, N.ord, M), panAgg: link(gl, N.pan, N.agg, M) };
+    link(gl, N.src, N.ord, M); link(gl, N.ord, N.job, M, 'job-link'); link(gl, N.job, N.agg, M, 'job-link');
+    nbox(gn, N.src, 'Tienda', '🛒', 'client'); N.src.g.style.setProperty('--c', ORANGE);
+    N.src.sub.textContent = `${RATE} órdenes/s`;
+    nbox(gn, N.ord, 'ordenes', '🗄', 'srv data');
+    nbox(gn, N.job, 'Job', '⏱', 'jobn');
+    nbox(gn, N.agg, 'ventas_por_dia', '📋', 'srv data');
+    nbox(gn, N.pan, 'Panel de ventas', '📊', 'srv');
+    const bar = (n, cls) => {
+      svgEl('rect', { class: 'bar-bg', x: -n.hw + 10, y: n.hh - 10, width: n.hw * 2 - 20, height: 5, rx: 2.5 }, n.g);
+      return svgEl('rect', { class: cls, x: -n.hw + 10, y: n.hh - 10, width: 0, height: 5, rx: 2.5 }, n.g);
+    };
+    const panBar = bar(N.pan, 'prog'), jobBar = bar(N.job, 'jobprog');
+    const upd = hstats(slide, [['panel', 'Tardó el panel'], ['age', 'Antigüedad del dato'], ['cost', 'Trabajo del job']]);
+
+    const draw = () => {
+      N.ord.sub.textContent = `${Math.round(orders).toLocaleString('es-AR')} filas`;
+      const jobOn = mode === 'job';
+      N.job.g.classList.toggle('off', !jobOn);
+      N.agg.g.classList.toggle('off', !jobOn);
+      N.job.sub.textContent = !jobOn ? 'apagado' : running ? 'recorriendo…' : `cada ${every} s · ${jobRuns} corridas`;
+      N.agg.sub.textContent = jobOn && lastRunAt != null ? `al ${Math.floor(lastRunAt)} s` : 'vacía';
+      lk.panOrd.classList.toggle('off', jobOn);
+      lk.panAgg.classList.toggle('off', !jobOn);
+      N.pan.sub.textContent = busy ? 'calculando…' : panelMs == null ? 'cerrado' : `listo en ${Widgets.fmtLat(panelMs / 1000)}`;
+      upd({
+        panel: panelMs == null ? '—' : Widgets.fmtLat(panelMs / 1000),
+        age: dataAge == null ? '—' : dataAge < 0.5 ? 'al día' : `${Math.round(dataAge)} s`,
+        cost: jobOn ? `${jobCostSec.toFixed(1)} s` : '—'
+      });
+    };
+    clock.onTick = draw;
+
+    const progress = (el, n, dur, done) => clock.animate(dur, p => el.setAttribute('width', (n.hw * 2 - 20) * p), () => { el.setAttribute('width', 0); done(); });
+
+    const runJob = () => {
+      if (running || mode !== 'job') return;
+      running = true;
+      const snapshotAt = clock.now, dur = orders * PER_ORDER;
+      fly(clock, gp, N.ord, N.job, M, TEAL, null, 4, 0.3);
+      progress(jobBar, N.job, dur, () => {
+        if (mode !== 'job') { running = false; return; }
+        jobRuns++; jobCostSec += dur;
+        fly(clock, gp, N.job, N.agg, M, TEAL, () => { lastRunAt = snapshotAt; running = false; pop(gp, N.agg.x, N.agg.y - N.agg.hh - 8, '✔ actualizada', TEAL); draw(); }, 6, 0.3);
+      });
+    };
+
+    const openPanel = () => {
+      if (busy) return;
+      busy = true;
+      const t0 = clock.now, jobOn = mode === 'job';
+      const target = jobOn ? N.agg : N.ord;
+      const work = jobOn ? 0.05 : 0.2 + orders * PER_ORDER;
+      fly(clock, gp, N.pan, target, M, REQ, () => progress(panBar, N.pan, work, () => {
+        fly(clock, gp, target, N.pan, M, jobOn ? TEAL : GREEN, () => {
+          busy = false;
+          panelMs = Math.round(work * 1000);
+          dataAge = jobOn ? (lastRunAt == null ? null : t0 - lastRunAt) : 0;
+          draw();
+        }, 7, 0.3);
+      }), 6, 0.3);
+      draw();
+    };
+
+    const restartJob = () => {
+      if (jobTimer) jobTimer.cancel();
+      jobTimer = null;
+      if (mode === 'job') { runJob(); jobTimer = clock.every(every, runJob); }
+    };
+    clock.every(0.05, () => { orders += RATE * 0.05; });
+    clock.every(0.35, () => fly(clock, gp, N.src, N.ord, M, ORANGE, null, 4, 0.4));
+    seg(slide, 'mode', v => {
+      mode = v; showModeIn(slide, v);
+      slide.querySelector('.job-only').hidden = v !== 'job';
+      panelMs = dataAge = null; lastRunAt = null; jobRuns = 0; jobCostSec = 0;
+      restartJob(); draw();
+    });
+    const r = slide.querySelector('input.every'), out = slide.querySelector('.every-val');
+    r.addEventListener('input', () => { every = +r.value; out.textContent = `${every} s`; restartJob(); });
+    on(slide, '[data-act=panel]', openPanel);
+    draw();
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ mode, lastRunAt, dataAge, panelMs, jobRuns, jobCostSec }) };
+  };
+
+  /* ---------- 18. sumar al escribir ---------- */
+
+  S.alescribir = slide => {
+    const { svg, clock, M } = manual(slide, 'pre');
+    const ORANGE = '#fb923c', TEAL = '#2dd4bf';
+    const AMOUNTS = [1200, 850, 3000, 450, 2100];
+    let how = 'directo', fail = false, total = 0, trueTotal = 0, failures = 0, writeMs = null, k = 0, attempt = 0;
+    const N = M
+      ? { src: { x: W2(), y: 40, hw: 80, hh: 24 }, svc: { x: W2(), y: 140, hw: 90, hh: 30 }, db: { x: 105, y: 270, hw: 90, hh: 30 }, ev: { x: 300, y: 270, hw: 80, hh: 28 }, tot: { x: W2(), y: 390, hw: 110, hh: 32 } }
+      : { src: { x: 110, y: 290, hw: 80, hh: 28 }, svc: { x: 340, y: 290, hw: 100, hh: 36 }, db: { x: 680, y: 140, hw: 110, hh: 40 }, ev: { x: 560, y: 470, hw: 80, hh: 30 }, tot: { x: 780, y: 400, hw: 100, hh: 44 } };
+    function W2() { return NetKit.W / 2; }
+    const gl = svgEl('g', {}, svg), gn = svgEl('g', {}, svg), gp = svgEl('g', {}, svg);
+    link(gl, N.src, N.svc, M); link(gl, N.svc, N.db, M);
+    const lDirect = link(gl, N.svc, N.tot, M), lEv1 = link(gl, N.svc, N.ev, M, 'job-link'), lEv2 = link(gl, N.ev, N.tot, M, 'job-link');
+    nbox(gn, N.src, 'Tienda', '🛒', 'client'); N.src.g.style.setProperty('--c', ORANGE);
+    N.src.sub.textContent = 'nueva orden';
+    nbox(gn, N.svc, 'Órdenes', '🧾');
+    nbox(gn, N.db, 'ordenes', '🗄', 'srv data');
+    nbox(gn, N.ev, 'Eventos', '📣', 'jobn');
+    N.ev.sub.textContent = 'orden creada';
+    nbox(gn, N.tot, 'total_ventas', '💰', 'srv data');
+    const upd = hstats(slide, [['real', 'Suma real'], ['total', 'Total guardado'], ['write', 'Escritura']]);
+    const warn = slide.querySelector('.warn-line');
+    const money = v => `$${v.toLocaleString('es-AR')}`;
+    const draw = () => {
+      const ev = how === 'evento';
+      [N.ev.g, lEv1, lEv2].forEach(e => e.classList.toggle('off', !ev));
+      lDirect.classList.toggle('off', ev);
+      N.svc.sub.textContent = ev ? 'guarda y publica' : 'guarda y suma';
+      N.db.sub.textContent = `${k} órdenes · ${money(trueTotal)}`;
+      N.tot.sub.textContent = money(total);
+      N.tot.g.classList.toggle('bad', total !== trueTotal && failures > 0);
+      warn.hidden = !(failures > 0 && total !== trueTotal);
+      upd({ real: money(trueTotal), total: money(total), write: writeMs == null ? '—' : `${writeMs} ms` });
+    };
+
+    const applyTotal = (amount, from) => {
+      attempt++;
+      if (fail && attempt % 2 === 0) {
+        failures++;
+        fly(clock, gp, from, N.tot, M, RED, () => { pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, '✕ no se sumó', RED); draw(); }, 5, 0.4);
+        return;
+      }
+      fly(clock, gp, from, N.tot, M, TEAL, () => { total += amount; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, `+${money(amount)}`, TEAL); draw(); }, 5, 0.4);
+    };
+
+    const order = () => {
+      const amount = AMOUNTS[k % AMOUNTS.length];
+      fly(clock, gp, N.src, N.svc, M, ORANGE, () => {
+        fly(clock, gp, N.svc, N.db, M, ORANGE, () => { k++; trueTotal += amount; draw(); }, 5, 0.4);
+        if (how === 'directo') { writeMs = 8; applyTotal(amount, N.svc); }
+        else { writeMs = 5; fly(clock, gp, N.svc, N.ev, M, TEAL, () => clock.after(0.8, () => applyTotal(amount, N.ev)), 5, 0.4); }
+        draw();
+      }, 6, 0.4);
+    };
+
+    seg(slide, 'how', v => { how = v; showModeIn(slide, v); draw(); });
+    slide.querySelector('input[data-opt=fail]').addEventListener('change', e => { fail = e.target.checked; attempt = 0; });
+    on(slide, '[data-act=order]', order);
+    on(slide, '[data-act=fix]', () => { total = trueTotal; failures = 0; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, '⟲ recalculado', TEAL); draw(); });
+    clock.every(2.5, order);
+    draw();
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ total, trueTotal, writeMs, failures }) };
+  };
+
   window.Scenes = S;
 })();

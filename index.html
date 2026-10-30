@@ -502,15 +502,145 @@
   </aside>
 </section>
 
+<!-- ============ 16. UN JOB QUE DEJA TODO LISTO ============ -->
+<section data-scene="job">
+  <div class="kicker teal">Precálculo</div>
+  <h2>Un job que deja todo listo</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#fb923c"></i>orden nueva</span><span><i style="background:#7dd3fc"></i>consulta del panel</span><span><i style="background:#2dd4bf"></i>job</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">El <b>panel de ventas</b> suma todas las órdenes. Cada vez hay más órdenes, y cada apertura tarda más.</p>
+      <div class="seg" data-group="mode">
+        <button data-v="ondemand" class="active">Calcular al abrir</button><button data-v="job">Job que precalcula</button>
+      </div>
+      <p class="mode-text" data-mode="ondemand">Abrir el panel recorre la tabla <code>ordenes</code> entera.</p>
+      <p class="mode-text" data-mode="job" hidden>Un job recorre las órdenes cada tanto y escribe <code>ventas_por_dia</code>; el panel lee esa tabla chica.</p>
+      <div class="box job-only" hidden>
+        <div class="label">El job corre cada</div>
+        <div class="slider-row"><input class="every" type="range" min="5" max="60" step="5" value="10"><span class="every-val rate-out">10 s</span></div>
+      </div>
+      <div class="actions"><button class="btn primary" data-act="panel">📊 Abrir panel</button></div>
+      <div class="hstats"></div>
+    </div>
+  </div>
+  <aside class="notes">
+    "Calcular al abrir": cada vez que alguien abre el panel se recorren todas las órdenes. Al principio tarda un segundo; dejarlo correr y volver a abrir: tarda más, porque hay más órdenes. Es el caso de caché que no ayuda mucho: todos piden la suma "de hoy", que cambia todo el tiempo.
+    "Job que precalcula": un proceso programado (cron) recorre las órdenes cada N segundos (en la vida real, cada hora o cada noche) y deja el resultado en una tabla chica. Abrir el panel es instantáneo, pero el dato tiene la antigüedad de la última corrida, y el job trabaja aunque nadie abra el panel (mirar el costo acumulado).
+    La pregunta tiene que conocerse de antemano: "ventas por día" sí; "ventas de cualquier filtro que se le ocurra al usuario" no.
+    Pregunta para la clase: ¿cada cuánto correrían este job si el panel lo mira el gerente una vez por día?
+  </aside>
+</section>
+
+<!-- ============ 17. DESNORMALIZAR ============ -->
+<section>
+  <div class="kicker teal">Desnormalizar</div>
+  <h2>Guardar el dato como se lee</h2>
+  <div class="compare">
+    <div class="layer-card l4">
+      <h3>Normalizado <small>cada dato una vez</small></h3>
+      <pre class="sql">SELECT o.id, u.nombre, p.titulo, o.total
+FROM ordenes o
+JOIN usuarios u  ON u.id = o.usuario_id
+JOIN productos p ON p.id = o.producto_id
+WHERE o.fecha = CURRENT_DATE;</pre>
+      <ul>
+        <li class="fragment">✅ Un cambio se hace en un solo lugar</li>
+        <li class="fragment">❌ Cada lectura paga los JOIN</li>
+      </ul>
+      <div class="ex">Bien cuando se escribe mucho o las consultas son muy variadas</div>
+    </div>
+    <div class="layer-card teal">
+      <h3>Desnormalizado <small>listo para leer</small></h3>
+      <pre class="sql">-- tabla armada para la pantalla
+SELECT id, usuario_nombre, producto_titulo, total
+FROM ordenes_para_listado
+WHERE fecha = CURRENT_DATE;
+
+-- o una vista materializada
+REFRESH MATERIALIZED VIEW ventas_por_dia;</pre>
+      <ul>
+        <li class="fragment">✅ La lectura es directa, sin JOIN</li>
+        <li class="fragment">❌ Datos duplicados: si cambia el nombre de un usuario, hay que actualizar sus copias</li>
+      </ul>
+      <div class="ex">Bien cuando se lee mucho más de lo que se escribe</div>
+    </div>
+  </div>
+  <aside class="notes">
+    Desnormalizar es otra forma de precalcular: en vez de armar la respuesta en cada lectura (JOIN), la guardamos ya armada. Una vista materializada es lo mismo pero manejada por la base: se define con una consulta y se refresca cuando uno quiere (REFRESH), igual que el job de la slide anterior.
+    El costo es el de siempre: el dato está en dos lugares y hay que mantener la copia al día (o aceptar que esté un poco atrasada).
+    Pregunta para la clase: si un producto cambia de nombre, ¿qué pasa con las órdenes viejas en la tabla desnormalizada? ¿está mal o está bien?
+  </aside>
+</section>
+
+<!-- ============ 18. SUMAR AL ESCRIBIR ============ -->
+<section data-scene="alescribir">
+  <div class="kicker teal">Al escribir</div>
+  <h2>Sumar al escribir</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#fb923c"></i>orden</span><span><i style="background:#2dd4bf"></i>actualiza el total</span><span><i style="background:#f87171"></i>falla</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Cada orden nueva <b>suma al total</b> en el momento. Leer el total es instantáneo y está siempre al día… si nada falla.</p>
+      <div class="seg" data-group="how">
+        <button data-v="directo" class="active">En la misma operación</button><button data-v="evento">Por un evento</button>
+      </div>
+      <p class="mode-text" data-mode="directo">Órdenes guarda la orden y actualiza el total: la escritura tarda más.</p>
+      <p class="mode-text" data-mode="evento" hidden>Órdenes publica "orden creada" (un aviso para quien le interese) y otro proceso suma después: escritura rápida, total con un poco de atraso.</p>
+      <div class="actions">
+        <button class="btn primary" data-act="order">🧾 Nueva orden</button>
+        <button class="btn" data-act="fix">⟲ Recalcular total</button>
+      </div>
+      <label class="field"><span>💥 Falla la actualización del total</span><input type="checkbox" data-opt="fail"></label>
+      <div class="hstats"></div>
+      <p class="warn-line" hidden>⚠ El total guardado no coincide con la suma real: hace falta <b>reconciliar</b> (un job que recalcule).</p>
+    </div>
+  </div>
+  <aside class="notes">
+    Tercer camino del precálculo: mantener el resultado actualizado en cada escritura. El total de ventas se lee instantáneo y está siempre fresco.
+    El costo pasa a la escritura: cada orden hace un trabajo extra (o publica un evento que otro proceso consume, y entonces el total queda unos instantes atrasado).
+    Prender "falla la actualización": algunas órdenes se guardan pero no se suman. El total queda mal para siempre, y nadie se entera hasta que alguien compara. Por eso estos esquemas casi siempre vienen con un job de reconciliación (el botón "Recalcular total").
+    Pregunta para la clase: ¿qué es peor para una tienda, un total de ventas atrasado 1 hora o un total que está mal?
+  </aside>
+</section>
+
+<!-- ============ 19. COMPARACIÓN ============ -->
+<section>
+  <div class="kicker">Comparación</div>
+  <h2>Caché, job o sumar al escribir</h2>
+  <table class="cmp-table">
+    <tr><th></th><th class="pink">💾 Caché</th><th class="teal">⏱ Job / vista materializada</th><th class="orange">✍️ Sumar al escribir</th></tr>
+    <tr class="fragment"><td>¿Quién paga el costo?</td><td>El primer pedido (miss)</td><td>El job, en segundo plano</td><td>Cada escritura</td></tr>
+    <tr class="fragment"><td>¿Qué tan fresco?</td><td>Hasta el TTL o la invalidación</td><td>Lo de la última corrida</td><td>Al día (o casi, con eventos)</td></tr>
+    <tr class="fragment"><td>¿Qué se calcula de más?</td><td>Nada: sólo lo pedido</td><td>Todo, aunque nadie lo mire</td><td>Cada cambio, aunque nadie lea</td></tr>
+    <tr class="fragment"><td>¿Qué puede salir mal?</td><td>Datos viejos, estampida, cachear lo privado</td><td>Job caído → datos que envejecen</td><td>Una actualización perdida → total mal</td></tr>
+    <tr class="fragment"><td>Ideal para…</td><td>Lecturas repetidas de lo mismo</td><td>Preguntas conocidas sobre muchos datos</td><td>Contadores y totales simples</td></tr>
+  </table>
+  <aside class="notes">
+    Recorrer fila por fila con el panel de ventas como ejemplo: con caché, el primero que abre el panel paga; con un job, nadie paga al abrir pero ves lo de la última corrida; sumando al escribir, siempre al día pero cada orden trabaja más y un error deja el total mal.
+    Se combinan: un job que calcula agregados, una caché delante de esa tabla, y una CDN delante de la página.
+    Pregunta para la clase: para el contador de "personas viendo este producto ahora", ¿cuál elegirían?
+  </aside>
+</section>
+
 <!-- ============ 20. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>
   <h2>Lo que nos llevamos</h2>
   <div class="summary">
-    <div class="card good fragment"><div class="ico">🎯</div><h4>Idea clave</h4><p>Hacer barata una operación cara.</p></div>
+    <div class="card good fragment"><div class="ico">📈</div><h4>Medir el hit rate</h4><p>Depende del lugar, de la variedad y del patrón de acceso. Se mide, no se adivina.</p></div>
+    <div class="card good fragment"><div class="ico">⚖️</div><h4>Decidir TTL, reemplazo e invalidación</h4><p>Cuánto atraso se tolera, a quién sacar y quién avisa cuando algo cambia.</p></div>
+    <div class="card bad fragment"><div class="ico">🧊</div><h4>Prepararse para la caché fría</h4><p>La DB queda dimensionada para los misses: coalescing, jitter, precalentar.</p></div>
+    <div class="card bad fragment"><div class="ico">🔒</div><h4>No cachear lo que no se puede</h4><p>Consistencia fuerte, datos de otro usuario, lo que se escribe más de lo que se lee.</p></div>
+    <div class="card good fragment"><div class="ico">🌐</div><h4>HTTP y CDN para lo estático y lejano</h4><p>max-age, ETag, private/public, y nombres versionados para no invalidar.</p></div>
+    <div class="card good fragment"><div class="ico">⏱</div><h4>Precalcular si la pregunta se conoce</h4><p>Job, vista materializada o sumar al escribir: el costo se mueve, no desaparece.</p></div>
   </div>
   <aside class="notes">
-    Repasar cada tarjeta conectándola con su demo.
+    Repasar cada tarjeta conectándola con su demo. La idea de fondo: hacer barata una operación cara siempre mueve el costo a otro lado (memoria, frescura, escrituras, complejidad). La pregunta es dónde nos conviene pagarlo.
     Pregunta para la clase: ¿qué operación cara de un sistema que conozcan resolverían con cada una de estas herramientas?
   </aside>
 </section>

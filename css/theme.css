@@ -429,3 +429,23 @@ html.mobile .httpc .hdr { font-size: 11px; }
 .rb b.fast { background: var(--green); } .rb b.mid { background: var(--yellow); } .rb b.slow { background: var(--red); }
 .rb em { font: 600 13px var(--mono); font-style: normal; text-align: right; }
 html.mobile .cdnmap .edge-label { font-size: 8px; }
+
+/* ---------- precálculo ---------- */
+.kicker.teal { color: var(--teal); }
+.pre .jobn .node-box { fill: #0c2a2a; stroke: var(--teal); stroke-dasharray: 5 3; }
+.pre .off { opacity: .3; }
+.pre .link.off { opacity: .15; }
+.pre .link.job-link { stroke: #1d4a4a; stroke-dasharray: 4 4; }
+.pre .jobprog { fill: var(--teal); }
+.pre .srv.data.bad .node-box { stroke: var(--red); fill: #2a1118; }
+.layer-card.teal { border-top: 4px solid var(--teal); }
+pre.sql { margin: 0; padding: 12px 14px; background: #0b1228; border-radius: 10px; font: 14px/1.5 var(--mono); color: #cbd5e1; white-space: pre-wrap; box-shadow: none; width: auto; }
+.warn-line { font-size: 15px; color: var(--red); line-height: 1.4; }
+.cmp-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: 14px; font-size: 18px; text-align: left; }
+.cmp-table th { font-size: 19px; padding: 6px 12px; }
+.cmp-table th.pink { color: #f472b6; } .cmp-table th.teal { color: var(--teal); } .cmp-table th.orange { color: var(--orange); }
+.cmp-table td { padding: 12px; background: var(--panel); color: #cbd5e1; line-height: 1.35; }
+.cmp-table td:first-child { color: #fff; font-weight: 700; border-radius: 10px 0 0 10px; width: 210px; }
+.cmp-table td:last-child { border-radius: 0 10px 10px 0; }
+html.mobile .cmp-table { font-size: 12px; } html.mobile .cmp-table th { font-size: 12px; padding: 4px; } html.mobile .cmp-table td { padding: 6px; } html.mobile .cmp-table td:first-child { width: auto; }
+html.mobile pre.sql { font-size: 11px; }
