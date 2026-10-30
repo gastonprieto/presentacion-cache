@@ -288,12 +288,12 @@
     seg(slide, 'policy', v => { policy = v; showModeIn(slide, v); build(); });
     seg(slide, 'pattern', v => { pattern = v; build(); });
     on(slide, '[data-act=step]', () => { playing = false; schedule(); label(); step(); });
-    on(slide, '[data-act=play]', () => { if (i >= seq.length) build(); playing = !playing || i === 0 ? true : false; schedule(); label(); });
+    on(slide, '[data-act=play]', () => { if (i >= seq.length) { build(); playing = true; } else playing = !playing; schedule(); label(); });
     on(slide, '[data-act=reset]', () => { playing = true; build(); label(); });
     build();
     return {
       start: () => clock.start(), stop: () => clock.stop(),
-      state: () => ({ policy, pattern, hits, misses, slots: slots.filter(Boolean) })
+      state: () => ({ policy, pattern, playing, hits, misses, slots: slots.filter(Boolean) })
     };
   };
 
@@ -864,7 +864,10 @@
     const { svg, clock, M } = manual(slide, 'pre');
     const ORANGE = '#fb923c', TEAL = '#2dd4bf';
     const AMOUNTS = [1200, 850, 3000, 450, 2100];
-    let how = 'directo', fail = false, total = 0, trueTotal = 0, failures = 0, writeMs = null, k = 0, attempt = 0;
+    let how = 'directo', fail = false, total = 0, trueTotal = 0, failures = 0, writeMs = null, k = 0, attempt = 0, pending = 0;
+    const written = new Set(); // órdenes ya guardadas en la DB
+    let seq = 0;
+    let reconciled = new Set(); // órdenes que ya entraron en un recálculo: no se vuelven a sumar
     const N = M
       ? { src: { x: W2(), y: 40, hw: 80, hh: 24 }, svc: { x: W2(), y: 140, hw: 90, hh: 30 }, db: { x: 105, y: 270, hw: 90, hh: 30 }, ev: { x: 300, y: 270, hw: 80, hh: 28 }, tot: { x: W2(), y: 390, hw: 110, hh: 32 } }
       : { src: { x: 110, y: 290, hw: 80, hh: 28 }, svc: { x: 340, y: 290, hw: 100, hh: 36 }, db: { x: 680, y: 140, hw: 110, hh: 40 }, ev: { x: 560, y: 470, hw: 80, hh: 30 }, tot: { x: 780, y: 400, hw: 100, hh: 44 } };
@@ -894,22 +897,23 @@
       upd({ real: money(trueTotal), total: money(total), write: writeMs == null ? '—' : `${writeMs} ms` });
     };
 
-    const applyTotal = (amount, from) => {
+    const applyTotal = (amount, from, id) => {
       attempt++;
       if (fail && attempt % 2 === 0) {
         failures++;
-        fly(clock, gp, from, N.tot, M, RED, () => { pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, '✕ no se sumó', RED); draw(); }, 5, 0.4);
+        fly(clock, gp, from, N.tot, M, RED, () => { pending--; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, '✕ no se sumó', RED); draw(); }, 5, 0.4);
         return;
       }
-      fly(clock, gp, from, N.tot, M, TEAL, () => { total += amount; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, `+${money(amount)}`, TEAL); draw(); }, 5, 0.4);
+      fly(clock, gp, from, N.tot, M, TEAL, () => { pending--; if (reconciled.has(id)) { draw(); return; } total += amount; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, `+${money(amount)}`, TEAL); draw(); }, 5, 0.4);
     };
 
     const order = () => {
-      const amount = AMOUNTS[k % AMOUNTS.length];
+      const amount = AMOUNTS[k % AMOUNTS.length], id = ++seq;
+      pending++;
       fly(clock, gp, N.src, N.svc, M, ORANGE, () => {
-        fly(clock, gp, N.svc, N.db, M, ORANGE, () => { k++; trueTotal += amount; draw(); }, 5, 0.4);
-        if (how === 'directo') { writeMs = 8; applyTotal(amount, N.svc); }
-        else { writeMs = 5; fly(clock, gp, N.svc, N.ev, M, TEAL, () => clock.after(0.8, () => applyTotal(amount, N.ev)), 5, 0.4); }
+        fly(clock, gp, N.svc, N.db, M, ORANGE, () => { k++; trueTotal += amount; written.add(id); draw(); }, 5, 0.4);
+        if (how === 'directo') { writeMs = 8; applyTotal(amount, N.svc, id); }
+        else { writeMs = 5; fly(clock, gp, N.svc, N.ev, M, TEAL, () => clock.after(0.8, () => applyTotal(amount, N.ev, id)), 5, 0.4); }
         draw();
       }, 6, 0.4);
     };
@@ -917,10 +921,11 @@
     seg(slide, 'how', v => { how = v; showModeIn(slide, v); draw(); });
     slide.querySelector('input[data-opt=fail]').addEventListener('change', e => { fail = e.target.checked; attempt = 0; });
     on(slide, '[data-act=order]', order);
-    on(slide, '[data-act=fix]', () => { total = trueTotal; failures = 0; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, '⟲ recalculado', TEAL); draw(); });
-    clock.every(2.5, order);
+    on(slide, '[data-act=fix]', () => { total = trueTotal; reconciled = new Set(written); failures = 0; pop(gp, N.tot.x, N.tot.y - N.tot.hh - 8, '⟲ recalculado', TEAL); draw(); });
+    let auto = clock.every(2.5, order);
+    slide.querySelector('input[data-opt=auto]').addEventListener('change', e => { auto.cancel(); if (e.target.checked) auto = clock.every(2.5, order); });
     draw();
-    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ total, trueTotal, writeMs, failures }) };
+    return { start: () => clock.start(), stop: () => clock.stop(), ff: sec => ffClock(clock, sec), state: () => ({ total, trueTotal, writeMs, failures, pending }) };
   };
 
   window.Scenes = S;

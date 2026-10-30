@@ -45,6 +45,8 @@
 
     _alive(e, now) { return now < e.expiresAt; }
 
+    // Las entradas vencidas siguen ocupando lugar hasta que alguien las pide (como en una caché real con
+    // expiración perezosa); el desalojo no las prioriza.
     get(key, now) {
       const e = this.map.get(key);
       if (e && !this._alive(e, now)) {

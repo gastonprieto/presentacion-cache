@@ -52,6 +52,7 @@
       this.dbVersion = new Array(this.o.keys).fill(0);
       this.db = { busy: 0, queue: [] };
       this.rr = 0;
+      this.arrived = 0;
       this._makeCaches();
       this._build();
       this._scheduleArrival();
@@ -128,7 +129,7 @@
       const served = n - err;
       return {
         n, hits, misses: served - hits, hitRate: served ? hits / served : 0,
-        stale, staleRate: n ? stale / n : 0, dbReqs, dbBusy: this.db.busy, dbQueue: this.db.queue.length,
+        stale, staleRate: served ? stale / served : 0, dbReqs, dbBusy: this.db.busy, dbQueue: this.db.queue.length,
         err, p50: q(0.5), p95: q(0.95)
       };
     }
@@ -155,6 +156,7 @@
       const key = this.pick();
       const replica = this.rr++ % this.svcs.length;
       const req = { key, replica, gen: this.gen, lat: 0, t0: this.now };
+      this.arrived++;
       const svc = this.svcs[replica];
       const hops = this.front ? [this.client, this.front, svc] : [this.client, svc];
       this._path(hops, COL.req, () => this._atService(req));
@@ -181,9 +183,10 @@
 
     _miss(req, ci) {
       if (this.o.coalesce) {
-        const waiting = this.pending[ci].get(req.key);
+        const pm = this.pending[ci], waiting = pm.get(req.key);
         if (waiting) { req.waitFrom = this.now; waiting.push(req); return; }
-        this.pending[ci].set(req.key, []);
+        pm.set(req.key, []);
+        req.pmap = pm; // si la caché se recrea mientras tanto, igual responde a los que esperaban
       }
       this._toDb(req, ci);
     }
@@ -214,9 +217,9 @@
         const version = this.dbVersion[req.key];
         if (ci >= 0) this.caches[ci] && this.caches[ci].set(req.key, req.key, this.now, version);
         this._respond(req, false, false, [this.dbNode, this.svcs[req.replica]]);
-        if (ci >= 0 && this.o.coalesce) {
-          const waiting = this.pending[ci].get(req.key) || [];
-          this.pending[ci].delete(req.key);
+        if (req.pmap) {
+          const waiting = req.pmap.get(req.key) || [];
+          req.pmap.delete(req.key);
           waiting.forEach(w => { w.lat += this.now - w.waitFrom; this._respond(w, false, false, [this.svcs[w.replica]]); });
         }
       });
@@ -225,9 +228,9 @@
     _fail(req, ci) {
       this._log(req, 'err');
       this._path([this.dbNode, this.svcs[req.replica], this.client], COL.err, () => {});
-      if (ci >= 0 && this.o.coalesce) {
-        const waiting = this.pending[ci].get(req.key) || [];
-        this.pending[ci].delete(req.key);
+      if (req.pmap) {
+        const waiting = req.pmap.get(req.key) || [];
+        req.pmap.delete(req.key);
         waiting.forEach(w => { this._log(w, 'err'); this._path([this.svcs[w.replica], this.client], COL.err, () => {}); });
       }
     }

@@ -672,6 +672,59 @@ test('job: un panel en vuelo no se mezcla al cambiar de modo', async page => {
   check(st.panelMs === null && st.dataAge === null, JSON.stringify(st));
 });
 
+/* ---------- revisión final: detalles menores ---------- */
+
+test('reemplazo: pausa responde justo después de reiniciar', async page => {
+  await open(page);
+  const st = await evalScene(page, SL.reemplazo, sec => {
+    sec.querySelector('[data-act=reset]').click();
+    sec.querySelector('[data-act=play]').click();
+    return sec._scene.state();
+  });
+  check(st.playing === false, JSON.stringify(st));
+});
+
+test('alescribir: recalcular con una orden en viaje no la suma dos veces', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.alescribir, sec => {
+    const sc = sec._scene;
+    sec.querySelector('input[data-opt=auto]').click();
+    for (let i = 0; i < 40 && sc.state().pending; i++) sc.ff(0.25);
+    sec.querySelector('.seg[data-group=how] [data-v=evento]').click();
+    sec.querySelector('[data-act=order]').click();
+    sc.ff(1.6);
+    sec.querySelector('[data-act=fix]').click();
+    for (let i = 0; i < 60; i++) { sc.ff(0.25); if (sc.state().pending === 0) break; }
+    return sc.state();
+  });
+  check(r.pending === 0 && r.total === r.trueTotal, JSON.stringify(r));
+});
+
+test('cachesim: cambiar la capacidad no pierde pedidos que esperaban (coalescing)', async page => {
+  await open(page);
+  const r = await engine(page, svg => {
+    const s = new CacheSimKit.CacheSim(svg, { cache: 'shared', coalesce: true, rate: 12, capacity: 20 });
+    s.fastForward(1.5);
+    s.set('capacity', 8);
+    s.setRate(0);
+    s.fastForward(12);
+    return { arrived: s.arrived, logged: s.log.length };
+  });
+  check(r.arrived > 0 && r.arrived === r.logged, JSON.stringify(r));
+});
+
+test('cachesim: staleRate usa los pedidos servidos', async page => {
+  await open(page);
+  const w = await engine(page, svg => {
+    const s = new CacheSimKit.CacheSim(svg, { cache: 'shared', rate: 16, ttl: 60, capacity: 30 });
+    s.fastForward(4);
+    for (let i = 0; i < 6; i++) { s.writePrice(0); s.fastForward(1); }
+    return s.window(10);
+  });
+  check(w.err > 0 && w.stale > 0, `escenario sin errores o sin viejas: ${JSON.stringify(w)}`);
+  check(Math.abs(w.staleRate - w.stale / (w.n - w.err)) < 1e-9, JSON.stringify(w));
+});
+
 /* ---------- recorrido completo ---------- */
 
 test('escenas: stop/start sin errores', async (page, errors) => {

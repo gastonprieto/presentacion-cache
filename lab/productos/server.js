@@ -62,6 +62,7 @@ http.createServer(async (req, res) => {
   };
   if (url.pathname === '/health') return send(200, { ok: true });
   if (!m || !db.has(m[1])) return send(404, { error: 'no existe' });
+  if (m[2] ? req.method !== 'PUT' : req.method !== 'GET') return send(405, { error: `usá ${m[2] ? 'PUT' : 'GET'}` });
   const id = m[1], key = `producto:${id}`;
   const t0 = Date.now();
 
