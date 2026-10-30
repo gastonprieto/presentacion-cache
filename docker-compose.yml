@@ -1,0 +1,44 @@
+# Laboratorio de caché: Redis delante de un servicio lento, nginx como caché HTTP y un job de agregados en Postgres.
+# Instrucciones en el README ("Laboratorio con Docker").
+name: lab-cache
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "2mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    restart: unless-stopped
+
+  productos:
+    build: ./lab/productos
+    environment: { DEMORA_MS: 800, TTL_S: 30, INVALIDAR: "0" }
+    ports: ["8081:3000"]
+    depends_on: [redis]
+    restart: unless-stopped
+
+  web:
+    build: ./lab/web
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes: ["./lab/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"]
+    ports: ["8080:80"]
+    depends_on: [web]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: tienda, POSTGRES_DB: tienda }
+    volumes: ["./lab/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U postgres -d tienda -c 'select 1 from ventas_por_dia limit 1'"]
+      interval: 5s
+      retries: 60
+
+  job:
+    image: postgres:16-alpine
+    environment: { PGHOST: db, PGUSER: postgres, PGPASSWORD: tienda, PGDATABASE: tienda }
+    volumes: ["./lab/job/agregar.sql:/agregar.sql:ro"]
+    command: ["sh", "-c", "while true; do psql -qAt -f /agregar.sql; sleep 30; done"]
+    depends_on: { db: { condition: service_healthy } }
+    restart: unless-stopped
