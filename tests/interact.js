@@ -146,6 +146,119 @@ test('cache: zipf concentra', async page => {
   check(r.inRange, 'sorteos fuera de rango');
 });
 
+/* ---------- motor CacheSim ---------- */
+
+// Crea una CacheSim sobre un svg suelto, avanza `ff` segundos y devuelve window(win)
+const CSIM = `(svg, opts, ff, win) => {
+  const s = new CacheSimKit.CacheSim(svg, opts);
+  s.fastForward(ff);
+  return s.window(win);
+}`;
+
+test('cachesim: sin caché la DB se satura', async page => {
+  await open(page);
+  const w = await engine(page, `(svg) => (${CSIM})(svg, { rate: 8, cache: null }, 30, 20)`);
+  check(w.err > 0, `err=${w.err}`);
+  check(w.p95 > 1.5, `p95=${w.p95}`);
+});
+
+test('cachesim: con caché baja la carga', async page => {
+  await open(page);
+  const w = await engine(page, `(svg) => (${CSIM})(svg, { rate: 8, cache: 'shared', capacity: 20 }, 30, 20)`);
+  check(w.hitRate > 0.6, `hitRate=${w.hitRate}`);
+  check(w.err === 0, `err=${w.err}`);
+  check(w.dbReqs < w.n * 0.4, `dbReqs=${w.dbReqs} n=${w.n}`);
+});
+
+test('cachesim: el hit rate depende del tamaño y del patrón', async page => {
+  await open(page);
+  const r = await engine(page, `(svg) => {
+    const run = ${CSIM};
+    return {
+      small: run(svg, { cache: 'shared', capacity: 5 }, 60, 40).hitRate,
+      big: run(svg, { cache: 'shared', capacity: 25 }, 60, 40).hitRate,
+      zipf: run(svg, { cache: 'shared', capacity: 10, zipf: 1.1 }, 60, 40).hitRate,
+      uniform: run(svg, { cache: 'shared', capacity: 10, zipf: 0 }, 60, 40).hitRate
+    };
+  }`);
+  check(r.big > r.small, JSON.stringify(r));
+  check(r.zipf - r.uniform >= 0.25, JSON.stringify(r));
+});
+
+test('cachesim: capacidad ≥ claves', async page => {
+  await open(page);
+  const w = await engine(page, `(svg) => (${CSIM})(svg, { cache: 'shared', keys: 10, capacity: 10, ttl: Infinity }, 60, 40)`);
+  check(w.hitRate > 0.9, `hitRate=${w.hitRate}`);
+});
+
+test('cachesim: ttl y datos viejos', async page => {
+  await open(page);
+  const r = await engine(page, `(svg) => {
+    const run = invalidate => {
+      const s = new CacheSimKit.CacheSim(svg, { cache: 'shared', ttl: 30, invalidate });
+      for (let i = 0; i < 6; i++) { s.fastForward(5); s.writePrice(0); }
+      s.fastForward(5);
+      return s.window(35).stale;
+    };
+    return { none: run('none'), del: run('delete') };
+  }`);
+  check(r.none > 0, `stale sin invalidar=${r.none}`);
+  check(r.del === 0, `stale con delete=${r.del}`);
+});
+
+test('cachesim: flush provoca estampida', async page => {
+  await open(page);
+  const r = await engine(page, `(svg) => {
+    const run = extra => {
+      const s = new CacheSimKit.CacheSim(svg, Object.assign({ cache: 'shared', capacity: 30, rate: 16, ttl: Infinity }, extra));
+      s.prewarm(30);
+      s.fastForward(10);
+      const before = s.window(8).err;
+      s.flushCache();
+      s.fastForward(4);
+      return { before, after: s.window(4).err };
+    };
+    return { plain: run({}), mitigated: run({ coalesce: true, jitter: 0.3 }) };
+  }`);
+  check(r.plain.before === 0, `errores antes del flush=${r.plain.before}`);
+  check(r.plain.after > 0, `sin mitigación err=${r.plain.after}`);
+  check(r.mitigated.after === 0, `con coalescing err=${r.mitigated.after}`);
+});
+
+test('cachesim: local vs compartida', async page => {
+  await open(page);
+  const r = await engine(page, `(svg) => {
+    const run = ${CSIM};
+    return {
+      local: run(svg, { cache: 'local', replicas: 3, capacity: 10 }, 60, 40).hitRate,
+      shared: run(svg, { cache: 'shared', replicas: 3, capacity: 10 }, 60, 40).hitRate
+    };
+  }`);
+  check(r.local < r.shared, JSON.stringify(r));
+});
+
+test('cachesim: local invalida sólo la réplica que escribe', async page => {
+  await open(page);
+  const stale = await engine(page, `(svg) => {
+    const s = new CacheSimKit.CacheSim(svg, { cache: 'local', replicas: 3, capacity: 10, ttl: 60, invalidate: 'delete' });
+    s.fastForward(10); s.writePrice(0); s.fastForward(10);
+    return s.window(10).stale;
+  }`);
+  check(stale > 0, `stale=${stale}`);
+});
+
+test('cachesim: reset limpia estado', async page => {
+  await open(page);
+  const r = await engine(page, `(svg) => {
+    const s = new CacheSimKit.CacheSim(svg, { cache: 'shared', rate: 6 });
+    s.fastForward(5);
+    const gen = s.gen;
+    s.reset(Object.assign({}, s.o, { capacity: 3 }));
+    return { n: s.window(60).n, pk: svg.querySelectorAll('.pk').length, gen: s.gen > gen };
+  }`);
+  check(r.n === 0 && r.pk === 0 && r.gen, JSON.stringify(r));
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

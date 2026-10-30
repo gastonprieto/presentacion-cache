@@ -347,3 +347,15 @@ html.mobile .speed-ctl button { font-size: 16px; padding: 5px 7px; }
 html.mobile .speed-ctl span { min-width: 34px; }
 
 [hidden] { display: none !important; }
+
+/* ---------- caché (cachesim.js) ---------- */
+.netsim .redis .node-box { fill: #2a1020; stroke: #f472b6; }
+.netsim .front .node-box { fill: #15132b; stroke: #5b4b8f; }
+.netsim .srv.data.hot .node-box { stroke: var(--red); fill: #2a1118; }
+.netsim .link.cache-link { stroke: #5a2445; stroke-dasharray: 3 5; }
+.netsim .mem { fill: #1a0f1c; stroke: #f472b6; stroke-width: 1.5; }
+.netsim .mem-fill { fill: #f472b6; opacity: .55; }
+.netsim .pk.stale { stroke: #fde68a; stroke-width: 2; stroke-dasharray: 2 2; }
+.stat b.good { color: var(--green); }
+.stat b.warn { color: var(--yellow); }
+.stat b.bad { color: var(--red); }

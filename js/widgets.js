@@ -172,5 +172,69 @@
     });
   }
 
-  window.Widgets = { stats, chart, histogram, strip, fmtLat };
+
+  /* ---------- widgets de CacheSim ---------- */
+
+  const CLABELS = {
+    hitRate: 'Hit rate', p50: 'Latencia p50', p95: 'Latencia p95', dbReqs: 'Consultas DB/s',
+    stale: 'Resp. viejas', err: 'Errores', n: 'Pedidos'
+  };
+
+  function cacheStats(el, sim, fields, win = 5) {
+    fields = fields || ['hitRate', 'p95', 'dbReqs', 'err'];
+    el.classList.add('stats');
+    el.innerHTML = fields
+      .map(f => `<div class="stat s-${f}"><b data-f="${f}">0</b><span>${CLABELS[f]}</span></div>`)
+      .join('');
+    const update = () => {
+      const w = sim.window(win);
+      const v = {
+        hitRate: sim.o.cache ? `${Math.round(w.hitRate * 100)}%` : '—', p50: fmtLat(w.p50), p95: fmtLat(w.p95),
+        dbReqs: (w.dbReqs / win).toFixed(1), stale: w.n ? `${Math.round(w.staleRate * 100)}%` : '0%', err: w.err, n: w.n
+      };
+      fields.forEach(f => {
+        const b = el.querySelector(`[data-f="${f}"]`);
+        b.textContent = v[f];
+        if (f === 'p95') b.className = w.p95 == null ? '' : w.p95 < 0.5 ? 'good' : w.p95 < sim.o.slowThreshold ? 'warn' : 'bad';
+      });
+    };
+    throttle(sim, 0.25, update);
+    update();
+  }
+
+  // Hit rate (%) y consultas a la DB por segundo, en el tiempo. Usa canvas.cache-chart.
+  function cacheChart(canvas, sim) {
+    const N = 60;
+    const blank = () => Array(N).fill(null);
+    const ch = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: Array(N).fill(''),
+        datasets: [
+          { label: 'Hit rate %', data: blank(), yAxisID: 'y', borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,.12)', fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2, spanGaps: true },
+          { label: 'Consultas DB/s', data: blank(), yAxisID: 'y1', borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,.10)', fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2, spanGaps: true }
+        ]
+      },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 10, boxHeight: 10, font: { size: 12 } } } },
+        scales: {
+          x: { display: false },
+          y: { position: 'left', min: 0, max: 100, ticks: { color: '#f472b6', font: { size: 11 }, callback: v => `${v}%` }, grid: { color: 'rgba(148,163,184,.12)' } },
+          y1: { position: 'right', min: 0, suggestedMax: 6, ticks: { color: '#2dd4bf', font: { size: 11 } }, grid: { display: false } }
+        }
+      }
+    });
+    const [hit, db] = ch.data.datasets;
+    throttle(sim, 0.5, isReset => {
+      if (isReset) { hit.data = blank(); db.data = blank(); ch.update('none'); return; }
+      const w = sim.window(3);
+      hit.data.push(w.n ? Math.round(w.hitRate * 100) : null); hit.data.shift();
+      db.data.push(+(w.dbReqs / 3).toFixed(2)); db.data.shift();
+      ch.update('none');
+    });
+    return ch;
+  }
+
+  window.Widgets = { stats, chart, histogram, strip, fmtLat, cacheStats, cacheChart };
 })();
