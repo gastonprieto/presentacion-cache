@@ -93,17 +93,18 @@
   S.hitmiss = slide => {
     const sim = setupCache(slide, { cache: null, rate: 8, capacity: 20 });
     const range = rateSlider(slide, sim);
+    const out = slide.querySelector('.rate-out');
     const btn = slide.querySelector('[data-act=cache]');
     const label = () => { btn.textContent = sim.o.cache ? '⏻ Apagar caché' : '💾 Prender caché'; };
-    on(slide, '[data-act=cache]', () => { sim.set('cache', sim.o.cache ? null : 'shared'); label(); });
-    on(slide, '[data-act=reset]', () => { range.value = 8; sim.reset({ cache: null, rate: 8, capacity: 20 }); label(); });
+    on(slide, '[data-act=cache]', () => { sim.set('cache', sim.o.cache ? null : 'local'); label(); });
+    on(slide, '[data-act=reset]', () => { range.value = 8; out.textContent = '8 req/s'; sim.reset({ cache: null, rate: 8, capacity: 20 }); label(); });
     return life(sim);
   };
 
   /* ---------- 4. de qué depende el hit rate ---------- */
 
   S.hitrate = slide => {
-    const sim = setupCache(slide, { cache: 'shared', rate: 6, capacity: 10, keys: 50, zipf: 1.1 });
+    const sim = setupCache(slide, { cache: 'local', rate: 6, capacity: 10, keys: 50, zipf: 1.1 });
     const bind = (cls, key, out) => {
       const r = slide.querySelector(`input.${cls}`), o = slide.querySelector(out);
       r.addEventListener('input', () => { sim.set(key, +r.value); o.textContent = r.value; });
@@ -117,7 +118,7 @@
   /* ---------- 6. TTL ---------- */
 
   S.ttl = slide => {
-    const sim = setupCache(slide, { cache: 'shared', rate: 6, capacity: 20, ttl: 30 });
+    const sim = setupCache(slide, { cache: 'local', rate: 6, capacity: 20, ttl: 30 });
     const r = slide.querySelector('input.ttl'), out = slide.querySelector('.ttl-val');
     r.addEventListener('input', () => { sim.set('ttl', +r.value); out.textContent = `${r.value} s`; });
     on(slide, '[data-act=write]', () => sim.writePrice(0));
@@ -128,13 +129,23 @@
   /* ---------- 7. invalidación ---------- */
 
   S.invalidar = slide => {
-    const sim = setupCache(slide, { cache: 'shared', rate: 6, capacity: 20, ttl: 60, invalidate: 'none' });
+    const sim = setupCache(slide, { cache: 'local', rate: 6, capacity: 20, ttl: 60, invalidate: 'none' });
     seg(slide, 'inv', v => { sim.set('invalidate', v); showModeIn(slide, v); });
     on(slide, '[data-act=write]', () => sim.writePrice(0));
     return life(sim);
   };
 
-  /* ---------- 8. caché fría y estampida ---------- */
+  /* ---------- 8. escalar horizontalmente: N cachés en memoria ---------- */
+
+  S.escalar = slide => {
+    const opts = replicas => ({ cache: 'local', replicas, rate: 6, capacity: 10, ttl: 30, invalidate: 'delete' });
+    const sim = setupCache(slide, opts(1));
+    seg(slide, 'reps', v => { sim.reset(opts(+v)); showModeIn(slide, v); });
+    on(slide, '[data-act=write]', () => sim.writePrice(0, 0));
+    return life(sim);
+  };
+
+  /* ---------- 10. caché fría y estampida ---------- */
 
   S.fria = slide => {
     const opt = k => slide.querySelector(`input[data-opt=${k}]`).checked;
@@ -148,7 +159,7 @@
     return life(sim);
   };
 
-  /* ---------- 9. dónde vive la caché ---------- */
+  /* ---------- 9. una caché externa ---------- */
 
   S.donde = slide => {
     const sim = setupCache(slide, { cache: 'local', replicas: 3, rate: 6, capacity: 10, ttl: 60, invalidate: 'delete' });
@@ -474,11 +485,11 @@
     Object.entries(U).forEach(([k, u]) => { nbox(gn, u, USERS[k].name, USERS[k].emoji, 'client'); u.g.style.setProperty('--c', USERS[k].color); });
     nbox(gn, px, 'Caché compartida', '🗃', 'redis');
     nbox(gn, org, 'tienda.com', '🖥');
-    org.sub.textContent = '/mi-cuenta';
+    org.sub.textContent = '/perfil';
     const upd = hstats(slide, [['leaks', 'Datos ajenos'], ['origin', 'Al origen']]);
     let origin = 0;
     const draw = () => {
-      px.sub.textContent = shared ? `guarda /mi-cuenta (de ${USERS[shared].name})` : 'vacía';
+      px.sub.textContent = shared ? `guarda /perfil (de ${USERS[shared].name})` : 'vacía';
       Object.entries(U).forEach(([k, u]) => { u.sub.textContent = own[k] ? `su copia: de ${USERS[own[k]].name}` : 'sin copia'; });
       upd({ leaks, origin });
     };

@@ -99,13 +99,13 @@ curl -s -o /dev/null -w "%{http_code} · %{size_download} bytes\n" -H "If-None-M
 docker compose exec web wget -qO- --post-data= localhost:3000/static/app.js/nueva-version   # cambia el archivo (y el ETag)
 ```
 
-**Privada o compartida.** `/mi-cuenta` viene con `Cache-Control: private` y nginx no la guarda. `/mi-cuenta-mal` es la misma respuesta detrás de una configuración que ignora ese header, y le muestra a Beto la cuenta de Ana.
+**Privada o compartida.** `/perfil` viene con `Cache-Control: private` y nginx no la guarda. `/perfil-mal` es la misma respuesta detrás de una configuración que ignora ese header, y le muestra a Beto la cuenta de Ana.
 
 ```bash
-curl -s -H 'X-Usuario: ana'  localhost:8080/mi-cuenta        # Cuenta de ana
-curl -s -H 'X-Usuario: beto' localhost:8080/mi-cuenta        # Cuenta de beto
-curl -s -H 'X-Usuario: ana'  localhost:8080/mi-cuenta-mal    # Cuenta de ana
-curl -s -H 'X-Usuario: beto' localhost:8080/mi-cuenta-mal    # Cuenta de ana (!)
+curl -s -H 'X-Usuario: ana'  localhost:8080/perfil        # Perfil de ana
+curl -s -H 'X-Usuario: beto' localhost:8080/perfil        # Perfil de beto
+curl -s -H 'X-Usuario: ana'  localhost:8080/perfil-mal    # Perfil de ana
+curl -s -H 'X-Usuario: beto' localhost:8080/perfil-mal    # Perfil de ana (!)
 ```
 
 **Precálculo.** La consulta "cruda" recorre las órdenes. La tabla del job, en cambio, ya tiene la respuesta (mirá `calculado_en`: es la antigüedad del dato). La vista materializada es lo mismo, pero se refresca a mano.
@@ -127,6 +127,6 @@ SELECT * FROM mv_ventas_por_dia ORDER BY fecha DESC LIMIT 3;
 | Vaciar la caché con tráfico | `docker compose exec redis redis-cli FLUSHALL` | Estampida: todos los pedidos van a la DB a la vez | se vuelve a llenar sola |
 | Precio sin invalidar | `curl -X PUT "localhost:8081/productos/42/precio?valor=1"` | Precio viejo hasta 30 s después | esperar el TTL o `?invalidar=1` |
 | El job | `docker compose stop job` | `calculado_en` deja de avanzar: el panel muestra datos cada vez más viejos | `docker compose start job` |
-| Un proxy mal configurado | `curl -H 'X-Usuario: beto' localhost:8080/mi-cuenta-mal` | Datos de otro usuario | no usar `proxy_ignore_headers` con respuestas privadas |
+| Un proxy mal configurado | `curl -H 'X-Usuario: beto' localhost:8080/perfil-mal` | Datos de otro usuario | no usar `proxy_ignore_headers` con respuestas privadas |
 
 La CDN no está en el laboratorio (no se simula bien en una sola máquina). Para verla en un sitio real, mirá sus headers: `curl -sI https://www.cloudflare.com | grep -iE "cf-cache-status|age|cache-control"`. Otros proveedores usan `x-cache` o `age`.

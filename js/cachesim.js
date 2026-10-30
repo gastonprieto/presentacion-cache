@@ -1,5 +1,5 @@
 /* Simulación visual de una caché: Usuarios → (reparto) → Productos (1..3 réplicas) → caché → DB.
-   cache: null (todo a la DB) · 'shared' (un Redis para todas las réplicas) · 'local' (una caché en la memoria de cada réplica).
+   cache: null (todo a la DB) · 'shared' (una caché externa para todas las réplicas) · 'local' (una caché en la memoria de cada réplica).
    Cache-aside: el servicio busca en la caché; si no está (miss), consulta la DB y guarda el resultado.
    Cada producto tiene una versión de precio en la DB; una respuesta es vieja (stale) si la caché tenía una versión anterior.
    La latencia registrada es tiempo de caché + cola y consulta de la DB; el viaje animado de los puntos no cuenta.
@@ -311,7 +311,7 @@
         this.svcs.push(s);
       }
       this.redis = null;
-      if (o.cache === 'shared') this.redis = v ? this._box('redis', 105, 340, 92, 30, 'Redis', '⚡') : this._box('redis', 700, 150, 90, 36, 'Redis · caché', '⚡');
+      if (o.cache === 'shared') this.redis = v ? this._box('redis', 105, 340, 92, 30, 'Caché ext.', '⚡') : this._box('redis', 700, 150, 90, 36, 'Caché externa', '⚡');
       this.dbNode = v ? this._box('srv data', o.cache === 'shared' ? 295 : W / 2, 340, 92, 30, 'DB', '🗄') : this._box('srv data', 700, o.cache === 'shared' ? 430 : H / 2, 90, 36, 'DB', '🗄');
       this.dbNode.qg = svgEl('g', {}, this.dbNode.g);
 

@@ -108,7 +108,7 @@
       <div class="legend"><span><i style="background:#7dd3fc"></i>pedido</span><span><i style="background:#f472b6"></i>hit (desde la caché)</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#f87171"></i>error</span></div>
     </div>
     <div class="panel">
-      <p class="lead">El servicio <b>primero busca en la caché</b> (Redis, en memoria). Si está (<b class="pink">hit</b>), responde en milisegundos. Si no (<b>miss</b>), va a la DB y <b>guarda</b> el resultado.</p>
+      <p class="lead">El servicio guarda resultados <b>en su propia memoria</b> y <b>primero busca ahí</b>. Si está (<b class="pink">hit</b>), responde en milisegundos. Si no (<b>miss</b>), va a la DB y <b>guarda</b> el resultado.</p>
       <div class="actions">
         <button class="btn primary" data-act="cache">💾 Prender caché</button>
         <button class="btn ghost" data-act="reset">↺</button>
@@ -125,7 +125,7 @@
     </div>
   </div>
   <aside class="notes">
-    Arrancar sin caché con 8 req/s: la DB está saturada. Prender la caché: los primeros pedidos son misses (verdes, van a la DB) y en pocos segundos casi todo vuelve rosa desde Redis. Mirar cómo caen las consultas a la DB y la latencia.
+    Arrancar sin caché con 8 req/s: la DB está saturada. Prender la caché (un diccionario en la memoria del proceso de Productos: la cajita rosa): los primeros pedidos son misses (verdes, van a la DB) y en pocos segundos casi todo vuelve rosa: se responde desde la memoria del propio servicio. Mirar cómo caen las consultas a la DB y la latencia.
     Esto se llama cache-aside: el servicio decide buscar en la caché y, si no está, la llena. Es el patrón más común.
     Pregunta para la clase: ¿por qué al principio, con la caché recién prendida, sigue habiendo misses?
   </aside>
@@ -162,7 +162,7 @@
   <aside class="notes">
     Tres perillas: cuánto entra en la caché, cuántos productos distintos se piden y cómo se reparten los pedidos. "Pocos populares" es lo realista (ley de potencia: el 20% de los productos recibe la mayoría de las visitas). "Todos parejos" es el peor caso.
     Mostrar: con 10 lugares y pocos populares el hit rate ronda 50–55%; pasar a "todos parejos" y cae a ~20%. Subir los lugares a 40: ~80% con pocos populares, ~70% con todos parejos. Cada cambio de lugar empieza con la caché vacía: se ve cómo se llena.
-    El hit rate no se adivina: se mide (Redis lo informa con INFO stats).
+    El hit rate no se adivina: se mide (toda caché seria informa hits y misses).
     Pregunta para la clase: ¿qué tienen más parecido a "pocos populares": los productos de una tienda o los movimientos de cada cuenta de un banco?
   </aside>
 </section>
@@ -200,7 +200,7 @@
     Una caché siempre tiene lugar limitado (memoria). Cuando se llena, alguien tiene que salir: eso decide el algoritmo de reemplazo (eviction).
     Patrón "populares + un recorrido": A, B y C se piden todo el tiempo, y en el medio alguien recorre D…I una sola vez (un reporte, un bot que indexa el catálogo). LRU y FIFO sacan a los populares para hacerle lugar a cosas que no se vuelven a pedir; LFU los protege porque cuentan muchos pedidos.
     Patrón "cambia la moda": A–D estuvieron de moda y ahora se piden E–H. LFU se aferra a los viejos (tienen muchos pedidos acumulados) y los nuevos se pisan entre ellos: LRU gana.
-    Ningún algoritmo gana siempre: depende del patrón de acceso. En la práctica: LRU como punto de partida (en Redis, configurando maxmemory-policy allkeys-lru; por defecto Redis no saca nada y rechaza escrituras: noeviction), LFU cuando hay populares estables y recorridos que ensucian.
+    Ningún algoritmo gana siempre: depende del patrón de acceso. En la práctica: LRU como punto de partida, LFU cuando hay populares estables y recorridos que ensucian. Ojo: algunas cachés por defecto no sacan nada y rechazan escrituras cuando se llenan; hay que elegir la política.
     Pregunta para la clase: ¿qué patrón se parece más a una tienda en Black Friday?
   </aside>
 </section>
@@ -250,7 +250,7 @@
       <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
     </div>
     <div class="panel">
-      <p class="lead">En vez de esperar a que venza, el que <b>escribe</b> en la DB también toca la caché.</p>
+      <p class="lead">En vez de esperar a que venza, el que <b>escribe</b> en la DB también toca la caché. Con <b>una sola instancia</b> es fácil: el mismo proceso cambia el precio y borra su copia.</p>
       <div class="seg" data-group="inv">
         <button data-v="none" class="active">No avisar</button><button data-v="delete">Borrar la clave</button><button data-v="update">Actualizarla</button>
       </div>
@@ -266,14 +266,74 @@
     </div>
   </div>
   <aside class="notes">
-    Mostrar "No avisar" y cambiar el precio: ámbar durante un buen rato. Pasar a "Borrar la clave": al cambiar el precio aparece "✕ borra" sobre Redis y el siguiente pedido trae el precio nuevo desde la DB. "Actualizarla" escribe el valor nuevo directo.
+    Mostrar "No avisar" y cambiar el precio: ámbar durante un buen rato. Pasar a "Borrar la clave": al cambiar el precio aparece "✕ borra" sobre Productos y el siguiente pedido trae el precio nuevo desde la DB. "Actualizarla" escribe el valor nuevo directo.
     En la vida real el problema es saber qué borrar: el precio del producto 42 aparece en /productos/42, en la lista de la categoría, en la búsqueda, en el carrito… Cada vista cacheada es una clave más para invalidar.
     Borrar suele ser más seguro que actualizar: si dos escrituras compiten, actualizar puede dejar en la caché el valor de la que llegó última a la caché, no a la DB.
     Pregunta para la clase: si el precio del producto 42 aparece en cinco páginas distintas cacheadas, ¿cómo se enteran todas de que cambió?
   </aside>
 </section>
 
-<!-- ============ 8. CACHÉ FRÍA ============ -->
+<!-- ============ 8. ESCALAR ============ -->
+<section data-scene="escalar">
+  <div class="kicker red">Escalar</div>
+  <h2>Escalar horizontalmente: N cachés repetidas</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Productos ya no da abasto y lo <b>escalamos horizontalmente</b>: varias copias iguales, con algo adelante que reparte los pedidos. Cada copia trae <b>su propia caché en memoria</b>.</p>
+      <div class="seg" data-group="reps">
+        <button data-v="1" class="active">1 instancia</button><button data-v="3">3 réplicas</button>
+      </div>
+      <p class="mode-text" data-mode="1">Una caché: lo que aprendió un pedido le sirve a todos los siguientes.</p>
+      <p class="mode-text" data-mode="3" hidden>Tres cachés que guardan <b>lo mismo</b>: cada una paga sus propios misses y ocupa su propia memoria.</p>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio (desde la réplica 1)</button></div>
+      <div class="cstats" data-fields="hitRate,stale,dbReqs" data-window="10"></div>
+      <ul class="points">
+        <li class="fragment">El mismo producto guardado <b>N veces</b>: N× memoria, N× misses.</li>
+        <li class="fragment">La réplica que escribe <b>borra sólo su copia</b>: las otras siguen con el precio viejo.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Con 1 instancia el hit rate se estabiliza rápido. Pasar a 3 réplicas: cada una arranca vacía y tiene que hacer sus propios misses para el mismo producto; el hit rate baja y la DB recibe más consultas. La memoria total usada se triplica para guardar lo mismo.
+    Cambiar el precio: la escritura llega a una sola réplica (la 1), que borra su copia. Las otras dos no se enteran y siguen respondiendo el precio viejo (ámbar) hasta que les venza el TTL. Lo que en la slide anterior era fácil, con N copias se rompe.
+    Además: cada deploy o reinicio de una réplica vacía su caché.
+    Pregunta para la clase: ¿cómo harían para que la réplica que cambia el precio le avise a las otras dos? ¿y si fueran 20?
+  </aside>
+</section>
+
+<!-- ============ 9. UNA CACHÉ EXTERNA ============ -->
+<section data-scene="donde">
+  <div class="kicker pink">Caché externa</div>
+  <h2>Sacar la caché del proceso</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">La caché pasa a ser <b>un servicio aparte</b>, compartido por todas las réplicas. Comparar con una caché en cada réplica:</p>
+      <div class="seg" data-group="where">
+        <button data-v="local" class="active">En cada réplica</button><button data-v="shared">Externa (compartida)</button>
+      </div>
+      <p class="mode-text" data-mode="local">En memoria del proceso: sin viaje por la red, pero repetida N veces y cada una con <b>su versión</b> del dato.</p>
+      <p class="mode-text" data-mode="shared" hidden>Una sola caché: lo que aprende una réplica lo aprovechan todas y <b>un borrado alcanza</b>. A cambio: un salto de red más y otra pieza que se puede caer.</p>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio (desde la réplica 1)</button></div>
+      <div class="cstats" data-fields="hitRate,stale,p50" data-window="8"></div>
+    </div>
+  </div>
+  <aside class="notes">
+    "En cada réplica": lo de la slide anterior (hit rate más bajo, precio viejo en las réplicas que no escribieron). Pasar a "Externa": el hit rate sube porque las tres llenan la misma caché, y al cambiar el precio el borrado sobre la caché externa alcanza para todas: no hay ámbar.
+    El costo: la latencia de un hit sube un poco (p50), porque ahora hay un viaje por la red; y la caché externa es una pieza más que hay que operar y que se puede caer (o vaciar: lo vemos en la próxima).
+    Es común combinar: una caché en memoria chiquita y de TTL muy corto para lo muy caliente, y la externa atrás.
+    Pregunta para la clase: si la caché externa se cae, ¿la tienda se tiene que caer?
+  </aside>
+</section>
+
+<!-- ============ 10. CACHÉ FRÍA ============ -->
 <section data-scene="fria">
   <div class="kicker red">Caché fría</div>
   <h2>Se vació la caché</h2>
@@ -283,7 +343,7 @@
       <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
     </div>
     <div class="panel">
-      <p class="lead">Con <b>16 req/s</b> la DB está tranquila gracias a la caché. Pero si la caché se vacía (reinicio, deploy) o <b>vencen muchas claves juntas</b>, todos van a la DB a la vez: <b>estampida</b>.</p>
+      <p class="lead">Con <b>16 req/s</b> la DB está tranquila gracias a la caché externa. Pero si la caché se vacía (se reinicia, se cae) o <b>vencen muchas claves juntas</b>, todos van a la DB a la vez: <b>estampida</b>.</p>
       <div class="actions"><button class="btn danger" data-act="flush">⟲ Reiniciar caché</button><button class="btn ghost" data-act="reset">↺</button></div>
       <div class="box">
         <div class="label">Mitigaciones</div>
@@ -298,58 +358,42 @@
     Arranca con la caché precalentada y TTL de 20 s: a los 20 s vencen todas las claves juntas (se cargaron al mismo tiempo) y hay una estampida sola. "Reiniciar caché" la provoca a mano.
     Sin mitigaciones: cola llena en la DB, 503 en rojo. Coalescing: si 30 pedidos del producto 42 hacen miss a la vez, sólo uno consulta la DB y los demás esperan esa respuesta. Jitter: el TTL varía un poco por clave, así no vencen todas juntas. Precalentar: cargar las claves populares antes de abrir el tráfico (apagarlo y reiniciar con ↺ para ver el arranque en frío).
     Lección: con caché, la DB queda dimensionada para los misses, no para el tráfico total. Si la caché falla, la DB recibe una carga para la que no está preparada.
-    Pregunta para la clase: ¿qué pasa con la DB el día que reinician Redis en el horario pico?
+    Pregunta para la clase: ¿qué pasa con la DB el día que se reinicia la caché externa en el horario pico? ¿y con una caché en memoria cada vez que hacen un deploy?
   </aside>
 </section>
 
-<!-- ============ 9. DÓNDE VIVE ============ -->
-<section data-scene="donde">
-  <div class="kicker pink">Dónde vive</div>
-  <h2>En cada réplica o compartida</h2>
-  <div class="demo">
-    <div class="stage">
-      <svg class="sim"></svg>
-      <div class="legend"><span><i style="background:#f472b6"></i>hit</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#d97706"></i>precio viejo</span><span><i style="background:#fb923c"></i>escritura</span><span><i style="background:#f87171"></i>error</span></div>
-    </div>
-    <div class="panel">
-      <p class="lead">Productos tiene <b>3 réplicas</b> (copias iguales, con algo adelante que reparte los pedidos). ¿Cada una con su caché o una para todas?</p>
-      <div class="seg" data-group="where">
-        <button data-v="local" class="active">En cada réplica</button><button data-v="shared">Compartida (Redis)</button>
-      </div>
-      <p class="mode-text" data-mode="local">En memoria del proceso: sin viaje por la red, pero cada réplica llena la suya y tiene <b>su versión</b> del dato.</p>
-      <p class="mode-text" data-mode="shared" hidden>Una sola caché: un salto de red más, pero todos ven lo mismo y el lugar se aprovecha mejor.</p>
-      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio (en réplica 1)</button></div>
-      <div class="cstats" data-fields="hitRate,stale,p50" data-window="8"></div>
-    </div>
-  </div>
-  <aside class="notes">
-    "En cada réplica": el hit rate es más bajo (cada una tiene que llenar la suya y el mismo producto ocupa lugar tres veces). Cambiar el precio: la réplica 1 borra su copia, pero las otras dos siguen sirviendo el precio viejo hasta que les venza el TTL.
-    "Compartida": un borrado alcanza para todos. Cuesta un salto de red (algo de latencia) y Redis pasa a ser una pieza más que se puede caer.
-    Es común combinar: una caché local chiquita y de TTL muy corto para lo muy caliente, y Redis atrás.
-    Pregunta para la clase: ¿qué pasa con la caché local cada vez que hacen un deploy y las réplicas se reinician?
-  </aside>
-</section>
-
-<!-- ============ 10. QUÉ NO CACHEAR ============ -->
+<!-- ============ 11. QUÉ CACHEAR Y QUÉ NO ============ -->
 <section>
-  <div class="kicker red">Restricciones</div>
-  <h2>Qué no cachear (o con mucho cuidado)</h2>
-  <div class="summary">
-    <div class="card bad fragment"><div class="ico">📦</div><h4>Stock al pagar, saldos</h4><p>Necesitan el valor real <b>ahora</b>: un dato viejo vende lo que no hay.</p></div>
-    <div class="card bad fragment"><div class="ico">👤</div><h4>Datos de un usuario en una caché compartida</h4><p>Con la clave mal armada, un usuario ve los datos de otro.</p></div>
-    <div class="card bad fragment"><div class="ico">✍️</div><h4>Lo que se escribe más de lo que se lee</h4><p>Se invalida antes de reutilizarse: sólo suma trabajo.</p></div>
-    <div class="card bad fragment"><div class="ico">🧠</div><h4>Lo que no entra</h4><p>La memoria es limitada: si todo es distinto, el hit rate es bajo.</p></div>
-    <div class="card good fragment"><div class="ico">🏷</div><h4>Sí: catálogo, precios con TTL corto, configuración</h4><p>Se lee mucho, cambia poco y tolera unos segundos de atraso.</p></div>
-    <div class="card good fragment"><div class="ico">📐</div><h4>Sí: resultados caros y repetidos</h4><p>Búsquedas populares, páginas armadas, respuestas de otros servicios.</p></div>
+  <div class="kicker">Restricciones</div>
+  <h2>¿Qué cachear y qué no?</h2>
+  <div class="compare">
+    <div class="layer-card good">
+      <h3>✅ Conviene <small>se lee mucho, cambia poco</small></h3>
+      <ul>
+        <li class="fragment"><b>Catálogo</b>: nombres, fotos, descripciones.</li>
+        <li class="fragment"><b>Precios</b> con un TTL corto: unos segundos de atraso se toleran.</li>
+        <li class="fragment"><b>Resultados caros y repetidos</b>: búsquedas populares, páginas armadas, respuestas de otros servicios.</li>
+        <li class="fragment"><b>Datos de cada usuario</b> (perfil, carrito), si <b>la clave incluye al usuario</b>: <code>perfil:ana</code>.</li>
+      </ul>
+    </div>
+    <div class="layer-card bad">
+      <h3>❌ No conviene <small>o con mucho cuidado</small></h3>
+      <ul>
+        <li class="fragment"><b>Stock al pagar, saldos</b>: necesitan el valor real ahora; uno viejo vende lo que no hay.</li>
+        <li class="fragment"><b>Lo que se escribe más de lo que se lee</b>: se invalida antes de reutilizarse.</li>
+        <li class="fragment"><b>Lo que no entra</b>: si casi todo es distinto, el hit rate es bajo y sólo suma memoria.</li>
+        <li class="fragment"><b>Datos de un usuario con una clave que no lo incluye</b>: en una caché HTTP compartida la clave es la URL, y <code>/perfil</code> es igual para todos.</li>
+      </ul>
+    </div>
   </div>
   <aside class="notes">
-    Recorrer cada tarjeta con un ejemplo de la tienda. El de "datos de un usuario" lo vamos a ver en vivo con la caché HTTP.
-    Una buena regla: cachear lo que se lee mucho más de lo que se escribe y tolera estar un poco desactualizado. Si una de las dos no se cumple, pensarlo dos veces.
+    Regla general: conviene cachear lo que se lee mucho más de lo que se escribe y tolera estar un poco desactualizado. Si una de las dos no se cumple, pensarlo dos veces.
+    Los datos de un usuario aparecen en las dos columnas a propósito: no es el dato, es la clave. Con la clave perfil:ana está bien; con una clave que no identifica al usuario (por ejemplo, sólo la URL en un proxy compartido), Beto ve el perfil de Ana. Lo vamos a ver en vivo con la caché HTTP.
     Pregunta para la clase: ¿el carrito de compras se puede cachear? ¿con qué clave?
   </aside>
 </section>
 
-<!-- ============ 11. CACHÉ HTTP ============ -->
+<!-- ============ 12. CACHÉ HTTP ============ -->
 <section data-scene="http">
   <div class="kicker pink">Caché HTTP</div>
   <h2>El navegador también cachea</h2>
@@ -372,14 +416,14 @@
     </div>
   </div>
   <aside class="notes">
-    Todo lo anterior era una caché que pusimos nosotros (Redis). HTTP trae una caché incorporada en cada navegador, y el servidor la controla con headers.
+    Todo lo anterior era una caché que pusimos nosotros (en memoria o externa). HTTP trae una caché incorporada en cada navegador, y el servidor la controla con headers.
     Con max-age=60: el primer pedido viaja y vuelve con el archivo; los siguientes se responden desde el cajón rosa del navegador (mirar la edad de la copia). Cuando la edad pasa 60, el próximo pedido vuelve a salir. Con max-age=0 siempre sale.
     Es la misma idea de TTL, pero ahora la caché está en la máquina del usuario: si publicamos una versión nueva de app.js, los que tienen la copia la siguen usando hasta que venza. Esto lo resuelve la CDN con nombres versionados (lo vemos más adelante).
     Pregunta para la clase: ¿qué max-age le pondrían al logo de la tienda? ¿y al JSON con el precio de un producto?
   </aside>
 </section>
 
-<!-- ============ 12. VALIDACIÓN ============ -->
+<!-- ============ 13. VALIDACIÓN ============ -->
 <section data-scene="etag">
   <div class="kicker pink">Validación</div>
   <h2>Validar en vez de bajar de nuevo</h2>
@@ -410,14 +454,14 @@
   </aside>
 </section>
 
-<!-- ============ 13. PRIVADA O COMPARTIDA ============ -->
+<!-- ============ 14. PRIVADA O COMPARTIDA ============ -->
 <section data-scene="privada">
   <div class="kicker red">Privada o compartida</div>
   <h2>¿Quién puede guardar la respuesta?</h2>
   <div class="demo">
     <div class="stage"><svg class="sim"></svg></div>
     <div class="panel">
-      <p class="lead">En el medio hay una <b>caché compartida</b>: un proxy (servidor intermedio) que guarda respuestas <b>para todos</b>. Ana y Beto piden <code>/mi-cuenta</code>.</p>
+      <p class="lead">En el medio hay una <b>caché compartida</b>: un proxy (servidor intermedio) que guarda respuestas <b>para todos</b>. Ana y Beto piden <code>/perfil</code>.</p>
       <div class="seg" data-group="cc">
         <button data-v="public" class="active">public</button><button data-v="private">private</button><button data-v="no-store">no-store</button>
       </div>
@@ -436,14 +480,14 @@
     </div>
   </div>
   <aside class="notes">
-    Con public: Ana pide /mi-cuenta, el proxy guarda la respuesta. Beto pide /mi-cuenta y el proxy le devuelve… la de Ana (punto del color de Ana y cartel rojo). Esto pasó de verdad en sitios grandes por un header mal puesto.
+    Con public: Ana pide /perfil, el proxy guarda la respuesta. Beto pide /perfil y el proxy le devuelve… la de Ana (punto del color de Ana y cartel rojo). Esto pasó de verdad en sitios grandes por un header mal puesto.
     Con private: el proxy deja pasar; cada navegador guarda la suya. Con no-store: nadie guarda nada (datos bancarios, por ejemplo).
-    Lo mismo vale para una caché propia (Redis): la clave tiene que incluir al usuario si la respuesta depende del usuario.
+    Lo mismo vale para una caché propia: la clave tiene que incluir al usuario si la respuesta depende del usuario.
     Pregunta para la clase: ¿qué header le pondrían a la respuesta del carrito? ¿y a la foto de un producto?
   </aside>
 </section>
 
-<!-- ============ 14. CDN ============ -->
+<!-- ============ 15. CDN ============ -->
 <section data-scene="cdn">
   <div class="kicker pink">CDN</div>
   <h2>Llevar el contenido cerca</h2>
@@ -475,7 +519,7 @@
   </aside>
 </section>
 
-<!-- ============ 15. DISTRIBUIR E INVALIDAR ============ -->
+<!-- ============ 16. DISTRIBUIR E INVALIDAR ============ -->
 <section data-scene="distribuir">
   <div class="kicker pink">Distribuir</div>
   <h2>Distribuir e invalidar</h2>
@@ -502,7 +546,7 @@
   </aside>
 </section>
 
-<!-- ============ 16. UN JOB QUE DEJA TODO LISTO ============ -->
+<!-- ============ 17. UN JOB QUE DEJA TODO LISTO ============ -->
 <section data-scene="job">
   <div class="kicker teal">Precálculo</div>
   <h2>Un job que deja todo listo</h2>
@@ -534,7 +578,7 @@
   </aside>
 </section>
 
-<!-- ============ 17. DESNORMALIZAR ============ -->
+<!-- ============ 18. DESNORMALIZAR ============ -->
 <section>
   <div class="kicker teal">Desnormalizar</div>
   <h2>Guardar el dato como se lee</h2>
@@ -575,7 +619,7 @@ REFRESH MATERIALIZED VIEW ventas_por_dia;</pre>
   </aside>
 </section>
 
-<!-- ============ 18. SUMAR AL ESCRIBIR ============ -->
+<!-- ============ 19. SUMAR AL ESCRIBIR ============ -->
 <section data-scene="alescribir">
   <div class="kicker teal">Al escribir</div>
   <h2>Sumar al escribir</h2>
@@ -608,7 +652,7 @@ REFRESH MATERIALIZED VIEW ventas_por_dia;</pre>
   </aside>
 </section>
 
-<!-- ============ 19. COMPARACIÓN ============ -->
+<!-- ============ 20. COMPARACIÓN ============ -->
 <section>
   <div class="kicker">Comparación</div>
   <h2>Caché, job o sumar al escribir</h2>
@@ -627,7 +671,26 @@ REFRESH MATERIALIZED VIEW ventas_por_dia;</pre>
   </aside>
 </section>
 
-<!-- ============ 20. CIERRE ============ -->
+<!-- ============ 21. HERRAMIENTAS ============ -->
+<section>
+  <div class="kicker">Ejemplos</div>
+  <h2>Herramientas reales</h2>
+  <div class="summary tools">
+    <div class="card fragment"><div class="ico">🧠</div><h4>Caché en memoria del proceso</h4><p>Caffeine (Java), <code>lru-cache</code> (Node), <code>MemoryCache</code> (.NET), <code>functools.lru_cache</code> (Python).</p></div>
+    <div class="card fragment"><div class="ico">⚡</div><h4>Caché externa</h4><p><b>Redis</b> (y Valkey), <b>Memcached</b>. Redis informa hits y misses con <code>INFO stats</code> y se elige la política con <code>maxmemory-policy</code> (por defecto <code>noeviction</code>: no saca nada).</p></div>
+    <div class="card fragment"><div class="ico">🗃</div><h4>Caché HTTP compartida</h4><p>nginx (<code>proxy_cache</code>), Varnish, y las que traen los API gateways.</p></div>
+    <div class="card fragment"><div class="ico">🌐</div><h4>CDN</h4><p>Cloudflare, Fastly, Amazon CloudFront, Akamai.</p></div>
+    <div class="card fragment"><div class="ico">⏱</div><h4>Precálculo</h4><p>Jobs con cron, Kubernetes CronJob o Airflow; vistas materializadas de PostgreSQL.</p></div>
+    <div class="card fragment"><div class="ico">🧪</div><h4>Laboratorio</h4><p>El repo trae un <code>docker compose</code> con Redis, nginx y PostgreSQL para probar todo esto con <code>curl</code>.</p></div>
+  </div>
+  <aside class="notes">
+    Recién ahora los nombres: todo lo que vimos son ideas que cada herramienta implementa a su manera. Lo importante es saber qué preguntar: ¿dónde vive?, ¿cómo se invalida?, ¿qué pasa cuando se llena o se cae?
+    En Redis: por defecto no desaloja nada (noeviction) y rechaza escrituras al llenarse; para usarlo como caché hay que configurar maxmemory y una política (allkeys-lru o allkeys-lfu).
+    Pregunta para la clase: ¿qué de esto usa el sistema en el que trabajan hoy?
+  </aside>
+</section>
+
+<!-- ============ 22. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>
   <h2>Lo que nos llevamos</h2>

@@ -288,7 +288,7 @@ test('escena hitmiss: prender la caché sube el hit rate', async page => {
     sim.fastForward(10);
     return { cache: sim.o.cache, hitRate: sim.window(5).hitRate };
   });
-  check(r.cache === 'shared', `cache=${r.cache}`);
+  check(r.cache === 'local', `cache=${r.cache}`);
   check(r.hitRate > 0.5, `hitRate=${r.hitRate}`);
 });
 
@@ -342,7 +342,7 @@ test('escena reemplazo: paso a paso', async page => {
 
 /* ---------- escenas: TTL, invalidación, caché fría, dónde vive ---------- */
 
-Object.assign(SL, { ttl: 6, invalidar: 7, fria: 8, donde: 9, nocachear: 10 });
+Object.assign(SL, { ttl: 6, invalidar: 7, escalar: 8, donde: 9, fria: 10, nocachear: 11 });
 
 test('escena ttl: ttl 0 da hit rate 0', async page => {
   await open(page);
@@ -426,7 +426,7 @@ test('escena donde: local deja réplicas con precio viejo', async page => {
 
 /* ---------- escenas: caché HTTP ---------- */
 
-Object.assign(SL, { http: 11, etag: 12, privada: 13 });
+Object.assign(SL, { http: 12, etag: 13, privada: 14 });
 
 test('escena http: max-age 60 evita el segundo pedido', async page => {
   await open(page);
@@ -482,7 +482,7 @@ test('escena privada: public filtra, private no', async page => {
 
 /* ---------- escenas: CDN ---------- */
 
-Object.assign(SL, { cdn: 14, distribuir: 15 });
+Object.assign(SL, { cdn: 15, distribuir: 16 });
 
 test('escena cdn: con CDN baja la latencia y la carga del origen', async page => {
   await open(page);
@@ -538,7 +538,7 @@ test('cdn: reset a mitad del deploy', async (page, errors) => {
 
 /* ---------- escenas: precálculo ---------- */
 
-Object.assign(SL, { job: 16, desnormalizar: 17, alescribir: 18, comparacion: 19, cierre: 20 });
+Object.assign(SL, { job: 17, desnormalizar: 18, alescribir: 19, comparacion: 20, herramientas: 21, cierre: 22 });
 
 test('escena job: el job hace rápido el panel y deja dato viejo', async page => {
   await open(page);
@@ -571,6 +571,39 @@ test('escena alescribir: falla desincroniza', async page => {
   });
   check(r.ok.total === r.ok.trueTotal, JSON.stringify(r.ok));
   check(r.bad.total < r.bad.trueTotal && r.bad.failures > 0, JSON.stringify(r.bad));
+});
+
+/* ---------- recorrido de la caché: en el proceso → escalar → externa ---------- */
+
+test('texto: las herramientas reales recién al final', async page => {
+  await open(page);
+  const r = await page.evaluate(herr => {
+    const secs = [...document.querySelectorAll('.reveal .slides > section')];
+    const early = secs.slice(0, herr).map((s, i) => /Redis|Memcached/.test(s.textContent) ? i : null).filter(i => i !== null);
+    return { early, herr: /Redis/.test(secs[herr].textContent) && /Memcached/.test(secs[herr].textContent) };
+  }, SL.herramientas);
+  check(!r.early.length, `nombran productos antes de tiempo: ${r.early}`);
+  check(r.herr, 'la slide de herramientas no nombra Redis/Memcached');
+});
+
+test('cachesim: la caché compartida se dibuja como caché externa', async page => {
+  await open(page);
+  const txt = await engine(page, svg => { new CacheSimKit.CacheSim(svg, { cache: 'shared' }); return svg.textContent; });
+  check(!/Redis/.test(txt) && /Caché externa/.test(txt), txt.slice(0, 200));
+});
+
+test('escena escalar: N réplicas repiten la caché e invalidan sólo la propia', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.escalar, sec => {
+    const sim = sec._scene.sim, reps = v => sec.querySelector(`.seg[data-group=reps] [data-v="${v}"]`).click();
+    reps(1); sim.fastForward(40); const one = sim.window(25).hitRate;
+    reps(3); sim.fastForward(40); const three = sim.window(25).hitRate;
+    sec.querySelector('[data-act=write]').click(); sim.fastForward(8);
+    return { one, three, cache: sim.o.cache, replicas: sim.o.replicas, stale: sim.window(8).stale };
+  });
+  check(r.cache === 'local' && r.replicas === 3, JSON.stringify(r));
+  check(r.three < r.one, `hit rate 1 réplica=${r.one} · 3 réplicas=${r.three}`);
+  check(r.stale > 0, `stale=${r.stale}`);
 });
 
 /* ---------- revisión final: estado en vuelo al cambiar de modo ---------- */

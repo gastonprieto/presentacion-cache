@@ -1,6 +1,6 @@
-// Origen de estáticos y de /mi-cuenta para el laboratorio de caché HTTP. Sin dependencias.
+// Origen de estáticos y de /perfil para el laboratorio de caché HTTP. Sin dependencias.
 // /static/app.js: 180 KB con Cache-Control: public, max-age=60 y ETag (responde 304 a If-None-Match).
-// /mi-cuenta: datos del usuario del header X-Usuario, con Cache-Control: private.
+// /perfil: datos del usuario del header X-Usuario, con Cache-Control: private.
 // POST /static/app.js/nueva-version: cambia el contenido (y el ETag).
 const http = require('node:http');
 const crypto = require('node:crypto');
@@ -33,11 +33,11 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', ETag: tag, 'Cache-Control': 'public, max-age=60' });
     return res.end(bundle);
   }
-  if (path === '/mi-cuenta') {
+  if (path === '/perfil') {
     const u = req.headers['x-usuario'] || 'anónimo';
-    log(`/mi-cuenta de ${u}`);
+    log(`/perfil de ${u}`);
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'private, max-age=60' });
-    return res.end(`Cuenta de ${u} · saldo $${u.length * 1234}\n`);
+    return res.end(`Perfil de ${u} · email ${u}@tienda.com · dirección: Calle ${u.length * 123}\n`);
   }
   res.writeHead(404); res.end('no existe\n');
 }).listen(3000, () => log('escuchando en :3000'));

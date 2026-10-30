@@ -449,3 +449,10 @@ pre.sql { margin: 0; padding: 12px 14px; background: #0b1228; border-radius: 10p
 .cmp-table td:last-child { border-radius: 0 10px 10px 0; }
 html.mobile .cmp-table { font-size: 12px; } html.mobile .cmp-table th { font-size: 12px; padding: 4px; } html.mobile .cmp-table td { padding: 6px; } html.mobile .cmp-table td:first-child { width: auto; }
 html.mobile pre.sql { font-size: 11px; }
+.summary.tools .card { border-top: 3px solid var(--muted); }
+.summary.tools .card p { font-size: 16px; }
+.card.warn { border-top: 3px solid var(--yellow); }
+.layer-card.good { border-top: 4px solid var(--green); }
+.layer-card.bad { border-top: 4px solid var(--red); }
+.layer-card.good ul, .layer-card.bad ul { font-size: 19px; line-height: 1.5; }
+.layer-card.good li, .layer-card.bad li { margin-bottom: 8px; }
