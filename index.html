@@ -36,6 +36,137 @@
   </aside>
 </section>
 
+<!-- ============ 1. UNA OPERACIÓN CARA ============ -->
+<section data-scene="cara">
+  <div class="kicker red">El problema</div>
+  <h2>Una operación cara</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#7dd3fc"></i>pedido</span><span><i style="background:#f472b6"></i>hit (desde la caché)</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">Cada <code>GET /productos/42</code> consulta la DB: <b>~800 ms</b> por consulta y <b>4 a la vez</b>. Con tráfico, se hace cola.</p>
+      <div class="box">
+        <div class="label">Tráfico</div>
+        <div class="slider-row"><input class="rate" type="range" min="1" max="12" step="1" value="3"><span class="rate-out">3 req/s</span></div>
+        <div class="cap-out">la DB atiende ≈ <b>5</b> req/s</div>
+      </div>
+      <div class="cstats" data-fields="p50,p95,dbReqs,err" data-window="5"></div>
+      <ul class="points">
+        <li class="fragment">Todos pagan el costo, <b>aunque pidan lo mismo</b>.</li>
+        <li class="fragment">Pasada la capacidad: cola, lentitud y <b>503</b>.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Arrancar en 3 req/s: anda, pero cada pedido tarda casi un segundo. Subir a 6 y después a 10: la cola de la DB (cuadraditos naranjas) crece, la latencia se dispara y aparecen 503 cuando la cola se llena.
+    Remarcar que la mayoría pide los mismos pocos productos (los populares) y aun así cada uno vuelve a hacer la consulta completa.
+    Pregunta para la clase: si 100 personas piden el mismo producto en un segundo, ¿cuántas veces tiene sentido calcular la respuesta?
+  </aside>
+</section>
+
+<!-- ============ 2. TRES CAMINOS ============ -->
+<section>
+  <div class="kicker">Tres caminos</div>
+  <h2>Calcular cada vez, guardar o calcular antes</h2>
+  <div class="ways">
+    <div class="way">
+      <div class="ico">🔁</div><h3>Calcular cada vez</h3>
+      <p>Cada pedido paga el costo completo.</p>
+      <div class="flow">pedido → 🗄 DB <b>800 ms</b><br>pedido → 🗄 DB <b>800 ms</b><br>pedido → 🗄 DB <b>800 ms</b></div>
+      <ul><li class="fragment">✅ Siempre fresco</li><li class="fragment">❌ Lento y caro con tráfico</li></ul>
+    </div>
+    <div class="way pink">
+      <div class="ico">💾</div><h3>Guardar lo calculado <small>caché</small></h3>
+      <p>El primero que pide paga; los siguientes reutilizan.</p>
+      <div class="flow">pedido → 💾 ✕ → 🗄 DB <b>800 ms</b><br>pedido → 💾 ✓ <b class="pink">2 ms</b><br>pedido → 💾 ✓ <b class="pink">2 ms</b></div>
+      <ul><li class="fragment">✅ Rápido para lo repetido</li><li class="fragment">❌ Puede servir datos viejos</li></ul>
+    </div>
+    <div class="way teal">
+      <div class="ico">⏱</div><h3>Calcular antes <small>precálculo</small></h3>
+      <p>Un proceso deja la respuesta lista antes de que la pidan.</p>
+      <div class="flow">⏱ 03:00 job → 📋 tabla lista<br>pedido → 📋 <b class="teal">5 ms</b><br>pedido → 📋 <b class="teal">5 ms</b></div>
+      <ul><li class="fragment">✅ Nadie espera al pedir</li><li class="fragment">❌ Se calcula aunque nadie lo pida</li></ul>
+    </div>
+  </div>
+  <p class="ways-foot fragment">Hoy: sobre todo el del medio (y dos casos famosos: <b>caché HTTP</b> y <b>CDN</b>). Al final, el precálculo.</p>
+  <aside class="notes">
+    Mapa de la clase: la mayor parte es el camino del medio (caché), con dos casos particulares muy usados: la caché HTTP y la CDN. Al final volvemos al tercer camino (precálculo) y comparamos los tres sobre el mismo problema.
+    La caché es "perezosa" (lazy): calcula sólo lo que alguien pidió, y el primero paga. El precálculo es "ansioso" (eager): calcula todo de antemano.
+    Pregunta para la clase: ¿en qué caso calcular cada vez es la mejor opción?
+  </aside>
+</section>
+
+<!-- ============ 3. HIT Y MISS ============ -->
+<section data-scene="hitmiss">
+  <div class="kicker pink">Caché</div>
+  <h2>Hit y miss</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#7dd3fc"></i>pedido</span><span><i style="background:#f472b6"></i>hit (desde la caché)</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <p class="lead">El servicio <b>primero busca en la caché</b> (Redis, en memoria). Si está (<b class="pink">hit</b>), responde en milisegundos. Si no (<b>miss</b>), va a la DB y <b>guarda</b> el resultado.</p>
+      <div class="actions">
+        <button class="btn primary" data-act="cache">💾 Prender caché</button>
+        <button class="btn ghost" data-act="reset">↺</button>
+      </div>
+      <div class="box">
+        <div class="label">Tráfico</div>
+        <div class="slider-row"><input class="rate" type="range" min="1" max="12" step="1" value="8"><span class="rate-out">8 req/s</span></div>
+      </div>
+      <div class="cstats" data-fields="hitRate,p95,dbReqs,err" data-window="5"></div>
+      <ul class="points">
+        <li class="fragment"><b>Hit rate</b> = hits ÷ pedidos. Es <b>el</b> número de una caché.</li>
+        <li class="fragment">La DB sólo ve los misses.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Arrancar sin caché con 8 req/s: la DB está saturada. Prender la caché: los primeros pedidos son misses (verdes, van a la DB) y en pocos segundos casi todo vuelve rosa desde Redis. Mirar cómo caen las consultas a la DB y la latencia.
+    Esto se llama cache-aside: el servicio decide buscar en la caché y, si no está, la llena. Es el patrón más común.
+    Pregunta para la clase: ¿por qué al principio, con la caché recién prendida, sigue habiendo misses?
+  </aside>
+</section>
+
+<!-- ============ 4. HIT RATE ============ -->
+<section data-scene="hitrate">
+  <div class="kicker pink">Hit rate</div>
+  <h2>¿De qué depende el hit rate?</h2>
+  <div class="demo">
+    <div class="stage">
+      <svg class="sim"></svg>
+      <div class="legend"><span><i style="background:#7dd3fc"></i>pedido</span><span><i style="background:#f472b6"></i>hit (desde la caché)</span><span><i style="background:#4ade80"></i>desde la DB</span><span><i style="background:#f87171"></i>error</span></div>
+    </div>
+    <div class="panel">
+      <div class="box">
+        <div class="label">Lugar en la caché</div>
+        <div class="slider-row"><input class="capacity" type="range" min="2" max="40" step="1" value="10"><span class="cap-val rate-out">10</span></div>
+        <div class="label">Productos distintos</div>
+        <div class="slider-row"><input class="keys" type="range" min="10" max="200" step="10" value="50"><span class="keys-val rate-out">50</span></div>
+      </div>
+      <div class="seg" data-group="pattern">
+        <button data-v="zipf" class="active">Pocos populares</button>
+        <button data-v="uniform">Todos parejos</button>
+      </div>
+      <div class="chart-box" style="height:118px"><canvas class="cache-chart"></canvas></div>
+      <div class="cstats" data-fields="hitRate,dbReqs,p95" data-window="8"></div>
+      <ul class="points">
+        <li class="fragment">Más lugar o menos variedad → más hits.</li>
+        <li class="fragment">Si unos pocos concentran los pedidos, una caché <b>chica</b> alcanza.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Tres perillas: cuánto entra en la caché, cuántos productos distintos se piden y cómo se reparten los pedidos. "Pocos populares" es lo realista (ley de potencia: el 20% de los productos recibe la mayoría de las visitas). "Todos parejos" es el peor caso.
+    Mostrar: con 10 lugares y pocos populares el hit rate ronda 70%; pasar a "todos parejos" y cae a ~20%. Subir los lugares a 40 y vuelve a subir. Cada cambio de lugar empieza con la caché vacía: se ve cómo se llena.
+    El hit rate no se adivina: se mide (Redis lo informa con INFO stats).
+    Pregunta para la clase: ¿qué tienen más parecido a "pocos populares": los productos de una tienda o los movimientos de cada cuenta de un banco?
+  </aside>
+</section>
+
 <!-- ============ 20. CIERRE ============ -->
 <section>
   <div class="kicker">Resumen</div>

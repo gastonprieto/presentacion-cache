@@ -359,3 +359,25 @@ html.mobile .speed-ctl span { min-width: 34px; }
 .stat b.good { color: var(--green); }
 .stat b.warn { color: var(--yellow); }
 .stat b.bad { color: var(--red); }
+
+/* ---------- tres caminos ---------- */
+.ways { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 26px; text-align: left; }
+.way { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--muted); border-radius: 14px; padding: 18px 20px; }
+.way.pink { border-top-color: #f472b6; }
+.way.teal { border-top-color: var(--teal); }
+.way .ico { font-size: 34px; }
+.way h3 { font-size: 22px; margin: 8px 0 6px; }
+.way h3 small { display: block; font: 600 13px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.way p { font-size: 17px; color: #cbd5e1; line-height: 1.4; }
+.way ul { margin: 10px 0 0; padding-left: 0; list-style: none; font-size: 17px; line-height: 1.6; }
+.kicker.pink { color: #f472b6; }
+b.pink { color: #f472b6; }
+html.mobile .ways { grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+.way { min-height: 330px; }
+.way .flow { margin-top: 12px; padding: 10px 12px; background: #0b1228; border-radius: 10px; font: 14px/1.9 var(--mono); color: var(--muted); }
+.way .flow b { color: var(--text); }
+.way .flow b.pink { color: #f472b6; }
+.way .flow b.teal { color: var(--teal); }
+.reveal .ways-foot, .ways-foot { margin-top: 26px; font-size: 20px; color: #cbd5e1; text-align: left; }
+html.mobile .way { min-height: 0; }
+html.mobile .ways-foot { font-size: 15px; margin-top: 12px; }

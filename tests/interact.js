@@ -259,6 +259,56 @@ test('cachesim: reset limpia estado', async page => {
   check(r.n === 0 && r.pk === 0 && r.gen, JSON.stringify(r));
 });
 
+/* ---------- escenas: el problema y hit/miss ---------- */
+
+// Índices de slide (0-based)
+const SL = { cara: 1, caminos: 2, hitmiss: 3, hitrate: 4 };
+
+// Mueve un slider de la slide y dispara 'input'
+const SLIDE_INPUT = `(sec, sel, v) => { const r = sec.querySelector(sel); r.value = v; r.dispatchEvent(new Event('input')); }`;
+
+test('escena cara: subir tráfico satura la DB', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.cara, `(sec, SI) => {
+    eval(SI)(sec, 'input.rate', 10);
+    sec._scene.sim.fastForward(15);
+    const w = sec._scene.sim.window(5);
+    const p95 = sec.querySelector('[data-f=p95]');
+    return { err: w.err, p95: w.p95, cls: p95.className, errTxt: sec.querySelector('[data-f=err]').textContent };
+  }`, SLIDE_INPUT);
+  check(r.err > 0 || r.p95 > 1.5, JSON.stringify(r));
+  check(r.cls === 'bad' || +r.errTxt > 0, `widget: ${JSON.stringify(r)}`);
+});
+
+test('escena hitmiss: prender la caché sube el hit rate', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.hitmiss, sec => {
+    sec.querySelector('[data-act=cache]').click();
+    const sim = sec._scene.sim;
+    sim.fastForward(10);
+    return { cache: sim.o.cache, hitRate: sim.window(5).hitRate };
+  });
+  check(r.cache === 'shared', `cache=${r.cache}`);
+  check(r.hitRate > 0.5, `hitRate=${r.hitRate}`);
+});
+
+test('escena hitrate: sliders cambian opciones', async page => {
+  await open(page);
+  const r = await evalScene(page, SL.hitrate, `(sec, SI) => {
+    const sim = sec._scene.sim;
+    eval(SI)(sec, 'input.capacity', 25);
+    eval(SI)(sec, 'input.keys', 120);
+    const cap = sim.o.capacity, keys = sim.o.keys;
+    sec.querySelector('.seg[data-group=pattern] [data-v=uniform]').click();
+    const z0 = sim.o.zipf;
+    sec.querySelector('.seg[data-group=pattern] [data-v=zipf]').click();
+    return { cap, keys, z0, z1: sim.o.zipf, chart: !!sec.querySelector('canvas.cache-chart') };
+  }`, SLIDE_INPUT);
+  check(r.cap === 25 && r.keys === 120, JSON.stringify(r));
+  check(r.z0 === 0 && r.z1 === 1.1, JSON.stringify(r));
+  check(r.chart, 'falta canvas.cache-chart');
+});
+
 /* ---------- runner ---------- */
 
 (async () => {

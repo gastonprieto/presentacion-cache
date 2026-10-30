@@ -13,6 +13,7 @@
     if (!inst) {
       inst = window.Scenes[name](slide);
       instances.set(slide, inst);
+      slide._scene = inst;
     }
     inst.start();
   }

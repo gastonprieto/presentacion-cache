@@ -291,7 +291,7 @@
 
       this.client = v ? this._box('client', W / 2, 36, 70, 24, 'Usuarios', '👥') : this._box('client', 90, H / 2, 66, 28, 'Usuarios', '👥');
       this.client.g.style.setProperty('--c', C.req);
-      this.client.sub.textContent = 'GET /productos/:id';
+      this.client.sub.textContent = 'GET /productos';
       this.front = null;
       if (m > 1) {
         this.front = v ? this._box('front', W / 2, 104, 52, 20, 'Reparto') : this._box('front', 235, H / 2, 46, 26, 'Reparto');

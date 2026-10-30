@@ -183,6 +183,7 @@
   function cacheStats(el, sim, fields, win = 5) {
     fields = fields || ['hitRate', 'p95', 'dbReqs', 'err'];
     el.classList.add('stats');
+    el.style.gridTemplateColumns = `repeat(${fields.length}, 1fr)`;
     el.innerHTML = fields
       .map(f => `<div class="stat s-${f}"><b data-f="${f}">0</b><span>${CLABELS[f]}</span></div>`)
       .join('');
