@@ -57,38 +57,45 @@ Duración: **unas 2 horas**, con tiempo para demos y preguntas → ~21 slides.
 - **Laboratorio con Docker** (`docker-compose.yml` + `lab/` + sección en el README), como en las otras.
 - Publicación en GitHub Pages (`gastonprieto.github.io/presentacion-cache`), rama `main`, raíz, push por HTTPS.
 
-## Recorrido y lista de slides (acordado)
+## Recorrido y lista de slides (acordado; actualizado tras la revisión local del autor, 2026-10-30)
 
-Hilo conductor: la tienda. Un producto (`GET /productos/42`) para la parte de caché, estáticos (`app.js`, imágenes) para HTTP/CDN, y el **panel de ventas** (suma de todas las órdenes) para el precálculo.
+Hilo conductor: la tienda. Un producto (`GET /productos/42`) para la parte de caché, estáticos (`app.js`, `/logo.png`) y `/perfil` para HTTP/CDN, y el **panel de ventas** (suma de todas las órdenes) para el precálculo.
+
+La parte de caché **arranca con una caché en memoria del propio proceso**, muestra el problema al **escalar horizontalmente** (N cachés repetidas: N× memoria, N× misses, y quien invalida sólo invalida la suya) y recién ahí pasa a **una caché externa compartida**. **No se nombran productos (Redis, Memcached…) hasta la slide "Herramientas reales"**, al final.
 
 | # | Kicker · Título | Demo | Qué se toca |
 |---|---|---|---|
 | 0 | Portada · "Hacer barata una operación cara" | fondo animado | — |
 | **El problema** |||
-| 1 | El problema · "Una operación cara" | cliente → servicio Productos → DB; cada consulta ~800 ms; al subir el tráfico la DB se satura (cola, lentas, errores) | slider de tráfico |
-| 2 | Tres caminos · "Calcular cada vez, guardar o calcular antes" | estática: los tres caminos con un dibujo cada uno | fragmentos |
+| 1 | El problema · "Una operación cara" | cliente → Productos → DB; ~800 ms por consulta, 4 a la vez; con tráfico se satura | slider de tráfico |
+| 2 | Tres caminos · "Calcular cada vez, guardar o calcular antes" | estática con un mini flujo por camino | fragmentos |
 | **Caché** |||
-| 3 | Caché · "Hit y miss" | servicio + Redis + DB (cache-aside): hits vuelven rosa desde Redis, misses bajan a la DB y se guardan. Métricas: hit rate, p50/p95, carga en la DB | botón caché on/off, slider de tráfico |
-| 4 | Hit rate · "¿De qué depende el hit rate?" | misma topología; hit rate y carga de DB en vivo (gráfico) | sliders: tamaño de la caché, cantidad de productos distintos; `seg` patrón: pocos populares (Zipf) / todos parejos |
-| 5 | Reemplazo · "Se llenó: ¿a quién saco?" | escena manual: fila de casilleros (p. ej. 4–6) y una secuencia de pedidos que entra; se ve qué clave sale. Hit rate por algoritmo | `seg` LRU / LFU / FIFO / random; `seg` patrón (populares / un *scan* que recorre todo una vez y le arruina el día a LRU); paso a paso y automático |
-| 6 | TTL · "Fresco o rápido" | cambia el precio en la DB y la caché sigue sirviendo el viejo hasta que vence (respuestas *stale* en otro color) | slider TTL; botón "cambiar precio"; métricas hit rate vs. % respuestas viejas |
-| 7 | Invalidación · "Al escribir, avisar a la caché" | escritura de precio: sin invalidar → viejo hasta el TTL; con invalidar (borrar la clave) → el próximo pedido es miss y trae el nuevo. Viñeta "dos cosas difíciles…" | `seg` sin invalidar / borrar clave / actualizar clave |
-| 8 | Caché fría · "Se vació la caché" | reiniciar Redis (o vencer muchas claves a la vez): todos van a la DB juntos, se satura (estampida) | botón "reiniciar caché"; toggles de mitigación: TTL con jitter, un solo cálculo por clave (coalescing), precalentar |
-| 9 | Dónde vive · "En cada réplica o compartida" | dos/tres réplicas del servicio: caché en memoria de cada una (rápida, hit rate más bajo, cada una con su versión del dato) vs. Redis compartido (un salto de red más, una sola versión) | `seg` local / compartida; botón cambiar precio |
-| 10 | Restricciones · "Qué no cachear" | estática (tarjetas `.summary` good/bad): stock al pagar / saldo (consistencia fuerte), datos de un usuario en caché compartida, lo que se escribe más de lo que se lee, límite de memoria | fragmentos |
+| 3 | Caché · "Hit y miss" | caché **en memoria del proceso** de Productos (cache-aside) | prender/apagar, tráfico |
+| 4 | Hit rate · "¿De qué depende el hit rate?" | ídem; hit rate y consultas a la DB en vivo | lugar, productos distintos, patrón |
+| 5 | Reemplazo · "Se llenó: ¿a quién saco?" | casilleros paso a paso | LRU/LFU/FIFO/random, dos patrones |
+| 6 | Expiración · "TTL: fresco o rápido" | precio viejo hasta que vence | slider TTL, cambiar precio |
+| 7 | Invalidación · "Al escribir, avisar a la caché" | con una sola instancia, el que escribe borra su copia | no avisar / borrar / actualizar |
+| 8 | Escalar · "Escalar horizontalmente: N cachés repetidas" | 1 instancia vs 3 réplicas, cada una con **su tabla de claves visible**; cambiar precio desde la réplica 1 deja `#0` viejo (ámbar) en las otras | 1 / 3 réplicas, cambiar precio |
+| 9 | Caché externa · "Sacar la caché del proceso" | en cada réplica vs externa compartida (una sola tabla); un borrado alcanza | local / externa, cambiar precio |
+| 10 | Caché fría · "Se vació la caché" | estampida al vaciarse o vencer todo junto | reiniciar; coalescing, jitter, precalentar |
+| 11 | Restricciones · "¿Qué cachear y qué no?" | dos columnas: conviene / no conviene (datos de usuario: sí, con la clave del usuario) | fragmentos |
 | **Caché HTTP** |||
-| 11 | Caché HTTP · "El navegador también cachea" | navegador con caché local; `Cache-Control: max-age=60`: el segundo pedido ni sale de la máquina; al vencer, sale de nuevo | botón pedir; slider/elección de `max-age`; ver headers |
-| 12 | Validación · "Validar en vez de bajar de nuevo" | vencido el `max-age`, el navegador manda `If-None-Match` con el `ETag` → `304 Not Modified` sin cuerpo; si cambió, `200` con el archivo. Contador de bytes | `seg` sin ETag / con ETag; botón "cambiar archivo" |
-| 13 | Compartida · "Privada o compartida" | navegador (privada) + caché compartida en el medio (un proxy, explicado en una línea): `public` se comparte entre usuarios; `private` sólo en el navegador; `no-store` no se guarda. El susto: `/mi-cuenta` sin `private` → un usuario ve los datos de otro | `seg` public / private / no-store; dos usuarios con colores distintos |
+| 12 | "El navegador también cachea" | `max-age` | max-age 0/10/60 |
+| 13 | "Validar en vez de bajar de nuevo" | `ETag` → 304 | sin/con ETag, cambiar archivo |
+| 14 | "¿Quién puede guardar la respuesta?" | Ana y Beto con **su caché de navegador** y una **caché compartida del camino** (proxy/CDN) con tabla por URL; `/logo.png` compartido es lo bueno, `/perfil` con `public` le da a Beto el perfil de Ana | pedir /perfil o /logo.png; public/private/no-store para /perfil |
 | **CDN** |||
-| 14 | CDN · "Llevar el contenido cerca" | escena manual: mapa simple con usuarios en varios continentes y el origen en un lugar; la latencia depende de la distancia. Al prender la CDN aparecen nodos de borde: el primer pedido de cada región va al origen (miss), el resto se responde en el borde. Métricas: latencia por región, pedidos al origen | toggle CDN; botón tráfico desde una región |
-| 15 | Distribuir · "Distribuir e invalidar" | cambia `app.js`: con purga (hay que avisar a todos los bordes, tarda, mientras tanto mezcla) vs. nombre versionado (`app.3f2a.js` + `max-age` largo: el HTML apunta al nuevo y no hay nada que invalidar) | `seg` purga / versionado; botón "deploy nueva versión" |
+| 15 | "Llevar el contenido cerca" | mapa con siluetas de continentes, rutas usuario→origen vs usuario→borde y latencia sobre cada usuario | prender CDN, sólo Sídney |
+| 16 | "Distribuir e invalidar" | purga vs nombres versionados | estrategia, publicar |
 | **Precálculo** |||
-| 16 | Precálculo · "Un job que deja todo listo" | panel de ventas: calcularlo bajo demanda suma todas las órdenes (lento); un job cada N minutos escribe una tabla de agregados chica y el panel la lee (rápido). Se ve la antigüedad del dato y lo que cuesta cada corrida | slider de frecuencia del job; botón "abrir panel"; nuevas órdenes llegando |
-| 17 | Desnormalizar · "Guardar el dato como se lee" | estática o demo chica: join caro entre Órdenes/Usuarios/Productos vs. tabla desnormalizada / vista materializada; costo: duplicación y mantenerla al día | fragmentos |
-| 18 | Al escribir · "Sumar al escribir" | cada orden nueva actualiza el total en el momento (directo o vía un evento, explicado en una línea): dato siempre fresco, escritura más cara, y si falla la actualización el total queda mal | botón nueva orden; toggle "falla la actualización" |
-| 19 | Comparación · "Caché, job o sumar al escribir" | tabla/columnas: quién paga el costo, cuán fresco está el dato, qué se calcula de más, qué puede salir mal | fragmentos |
-| 20 | Cierre · "Lo que nos llevamos" | resumen | — |
+| 17 | "Un job que deja todo listo" | calcular al abrir vs job | modo, frecuencia, abrir panel |
+| 18 | "Guardar el dato como se lee" | normalizado vs desnormalizado / vista materializada | fragmentos |
+| 19 | "Sumar al escribir" | en la misma operación o por evento; si falla, el total queda mal | nueva orden, órdenes automáticas, falla, recalcular |
+| 20 | "Caché, job o sumar al escribir" | tabla comparativa | fragmentos |
+| **Cierre** |||
+| 21 | Ejemplos · "Herramientas reales" | en memoria (Caffeine, lru-cache…), externa (Redis, Memcached), HTTP (nginx, Varnish), CDN, precálculo, laboratorio | fragmentos |
+| 22 | Resumen · "Lo que nos llevamos" | seis ideas | fragmentos |
+
+Ritmo: los pedidos y respuestas viajan pausados (escenas manuales 1,6× más lentas que el primer corte; 0,48 s por tramo en la simulación).
 
 ## Laboratorio con Docker (decisión del diseño, el autor no lo objetó)
 
