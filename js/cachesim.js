@@ -95,6 +95,7 @@
         const at = this.o.cache === 'shared' ? this.redis : this.svcs[replica];
         this._pop(at, this.o.invalidate === 'delete' ? `✕ borra #${key}` : `↻ #${key}`, COL.write);
       }
+      this.emit('write', key);
     }
 
     flushCache() {
@@ -428,5 +429,5 @@
     }
   }
 
-  window.CacheSimKit = { CacheSim, DEFAULTS, COL };
+  window.CacheSimKit = { CacheSim, DEFAULTS, COL, price };
 })();

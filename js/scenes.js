@@ -68,6 +68,13 @@
     if (st) Widgets.cacheStats(st, sim, st.dataset.fields ? st.dataset.fields.split(',') : null, +(st.dataset.window || 5));
     const cv = slide.querySelector('canvas.cache-chart');
     if (cv) Widgets.cacheChart(cv, sim);
+    // Botón de escritura: dice a cuánto pasa el precio del #0 (se refresca en cada escritura, también las automáticas)
+    const pc = slide.querySelector('.price-change');
+    if (pc) {
+      const { price } = window.CacheSimKit;
+      const sync = () => { const v = sim.dbVersion[0], t = `de ${price(0, v)} a ${price(0, v + 1)}`; if (pc.textContent !== t) pc.textContent = t; };
+      ['reset', 'write'].forEach(ev => sim.on(ev, sync)); sync();
+    }
     return sim;
   }
 

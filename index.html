@@ -221,7 +221,7 @@
         <div class="slider-row"><input class="ttl" type="range" min="0" max="60" step="5" value="30"><span class="ttl-val rate-out">30 s</span></div>
       </div>
       <div class="actions">
-        <button class="btn primary" data-act="write">✎ Cambiar precio del #0</button>
+        <button class="btn primary" data-act="write">✎ Cambiar precio del #0 <span class="price-change"></span></button>
         <label class="field"><input type="checkbox" data-opt="auto"> cada 5 s</label>
       </div>
       <div class="cstats" data-fields="hitRate,stale,dbReqs" data-window="10"></div>
@@ -257,7 +257,7 @@
       <p class="mode-text" data-mode="none">Sólo se actualiza la DB: precio viejo hasta el TTL (60 s).</p>
       <p class="mode-text" data-mode="delete" hidden>Se borra la clave: el próximo pedido es un miss y trae el precio nuevo.</p>
       <p class="mode-text" data-mode="update" hidden>Se escribe el precio nuevo también en la caché: el próximo pedido ya es hit.</p>
-      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio del #0</button></div>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio del #0 <span class="price-change"></span></button></div>
       <div class="cstats" data-fields="hitRate,stale,dbReqs" data-window="10"></div>
       <ul class="points">
         <li class="fragment">Hay que conocer <b>todas</b> las claves que dependen del dato.</li>
@@ -290,7 +290,7 @@
       </div>
       <p class="mode-text" data-mode="1">Una caché: lo que aprendió un pedido le sirve a todos los siguientes.</p>
       <p class="mode-text" data-mode="3" hidden>Tres cachés que guardan <b>lo mismo</b>: cada una paga sus propios misses y ocupa su propia memoria.</p>
-      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio (desde la réplica 1)</button></div>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio del #0 <span class="price-change"></span><br><small>desde la réplica 1</small></button></div>
       <div class="cstats" data-fields="hitRate,stale,dbReqs" data-window="10"></div>
       <ul class="points">
         <li class="fragment">El mismo producto guardado <b>N veces</b>: N× memoria, N× misses.</li>
@@ -323,7 +323,7 @@
       </div>
       <p class="mode-text" data-mode="local">En memoria del proceso: sin viaje por la red, pero repetida N veces y cada una con <b>su versión</b> del dato.</p>
       <p class="mode-text" data-mode="shared" hidden>Una sola caché: lo que aprende una réplica lo aprovechan todas y <b>un borrado alcanza</b>. A cambio: un salto de red más y otra pieza que se puede caer.</p>
-      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio (desde la réplica 1)</button></div>
+      <div class="actions"><button class="btn primary" data-act="write">✎ Cambiar precio del #0 <span class="price-change"></span><br><small>desde la réplica 1</small></button></div>
       <div class="cstats" data-fields="hitRate,stale,p50" data-window="8"></div>
     </div>
   </div>

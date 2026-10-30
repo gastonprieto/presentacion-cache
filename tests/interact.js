@@ -669,6 +669,19 @@ test('escena donde: clic en la caché externa muestra sus entradas', async page 
   check(/externa/i.test(r.title) && r.rows > 0, JSON.stringify(r));
 });
 
+test('botón cambiar precio dice a cuánto lo cambia', async page => {
+  await open(page);
+  for (const i of [SL.ttl, SL.invalidar, SL.escalar, SL.donde]) {
+    const r = await evalScene(page, i, sec => {
+      const btn = sec.querySelector('[data-act=write]'), before = btn.textContent;
+      btn.click();
+      return { before, after: btn.textContent };
+    });
+    check(/de \$1\.000 a \$1\.100/.test(r.before), `slide ${i} antes: ${r.before}`);
+    check(/de \$1\.100 a \$1\.200/.test(r.after), `slide ${i} después: ${r.after}`);
+  }
+});
+
 test('escena donde: la caché externa muestra una sola tabla', async page => {
   await open(page);
   const n = await evalScene(page, SL.donde, sec => {
