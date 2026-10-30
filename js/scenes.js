@@ -520,7 +520,7 @@
     { id: 'as', name: 'Tokio', x: 790, y: 210 },
     { id: 'oc', name: 'Sídney', x: 805, y: 465 }
   ];
-  const ORIGIN = { x: 175, y: 255 };
+  const ORIGIN = { x: 165, y: 290 };
   const CONTINENTS = [[215, 200, 125, 85], [305, 420, 55, 105], [480, 175, 60, 45], [490, 345, 70, 100], [690, 200, 150, 85], [800, 450, 70, 45]];
   // Celular: el mismo mapa escalado al lienzo de 400×440
   const mp = (x, y) => (NetKit.MOBILE ? { x: 8 + x * 0.42, y: 40 + y * 0.62 } : { x, y });

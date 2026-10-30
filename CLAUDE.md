@@ -29,6 +29,12 @@ Presentación interactiva en español (reveal.js + GSAP + Chart.js) sobre cómo 
 - `reset(opts)` borra el SVG, los timers y el estado, y emite `'reset'`. Los scripts async de las escenas comparan `sim.gen` antes y después de cada `await` para abortar si hubo un reset.
 - La latencia registrada en `sim.log` es tiempo en el servidor (cola + proceso + consulta a la DB); el viaje animado de los puntos no cuenta.
 
-**Widgets** (`js/widgets.js`): leen la `Sim` suscribiéndose a `'tick'`/`'reset'`. El helper `setup()` de `scenes.js` los conecta según lo que haya en la slide: `.stats` (`data-fields`, `data-window`), `.strip`, `canvas.chart` y `canvas.histo`. Un canvas con otro propósito tiene que usar otra clase.
+**Caché** (`js/cache.js`, `window.CacheKit`): modelo puro `Cache` (capacidad, TTL con jitter, políticas lru/lfu/fifo/random; LFU desempata por recencia), `rng` sembrado y `zipfPicker`. Lo prueban `tests/interact.js` sin dibujar.
 
-**Escenas** (`js/scenes.js`): una por slide interactiva, con los helpers `setup`, `on`, `seg`, `showMode` y `life`. Para dibujos que la `Sim` no cubre, el esqueleto `S.manual` muestra una escena con `Clock` propio y coordenadas para escritorio y celular.
+**CacheSim** (`js/cachesim.js`, `window.CacheSimKit`): Usuarios → (Reparto) → Productos ×1..3 → Redis compartido o caché local por réplica → DB (workers + cola; llena → 503). `set(clave, valor)` cambia opciones en vivo (topología → reset; capacidad/política/TTL/jitter → caché nueva), `writePrice(key, replica)` sube la versión en la DB e invalida según `invalidate`, `flushCache`, `prewarm`, `fastForward`, `window(sec)` → hitRate, stale, dbReqs, p50/p95, err. Una respuesta es vieja si la versión cacheada es menor que la de la DB.
+
+**Escenas manuales** (reemplazo, HTTP, CDN, precálculo): exponen `ff(sec)` y `state()` en `section._scene` para las pruebas (`main.js` guarda la instancia en `slide._scene`).
+
+**Widgets** (`js/widgets.js`): leen la simulación suscribiéndose a `'tick'`/`'reset'`. Para `CacheSim`: `cacheStats` (`.cstats` con `data-fields` de `hitRate,p50,p95,dbReqs,stale,err,n` y `data-window`) y `cacheChart` (`canvas.cache-chart`). Los de la `Sim` del template (`stats`, `chart`, `histogram`, `strip`) siguen ahí pero no se usan.
+
+**Escenas** (`js/scenes.js`): una por slide interactiva. Helpers: `setupCache` (CacheSim + widgets), `rateSlider`, `on`, `seg`, `showModeIn` (sólo `.mode-text`), `life`; para escenas manuales `manual`, `nbox`, `link`, `fly`, `ffClock` y `hstats` (contadores HTML). La CDN usa un mapa estilizado en coordenadas de escritorio que `mp()` escala en celular.

@@ -301,10 +301,12 @@
       for (let i = 0; i < m; i++) {
         const hw = v ? Math.min(62, W / (m + 1) / 2 - 6) : 82, hh = v ? 30 : 34;
         const x = v ? W * (i + 1) / (m + 1) : 420, y = v ? 200 : H * (i + 1) / (m + 1);
-        const s = this._box('srv', x, y, hw, hh, m > 1 ? `Productos ${i + 1}` : 'Productos', v && m > 1 ? null : '🏷');
+        const s = this._box('srv', x, y, hw, hh, m > 1 ? (v ? `P${i + 1}` : `Productos ${i + 1}`) : 'Productos', v && m > 1 ? null : '🏷');
         if (o.cache === 'local') {
-          s.mem = svgEl('rect', { class: 'mem', x: hw - 34, y: -hh + 6, width: 28, height: hh * 2 - 12, rx: 5 }, s.g);
-          s.memFill = svgEl('rect', { class: 'mem-fill', x: hw - 34, y: hh - 6, width: 28, height: 0, rx: 5 }, s.g);
+          const mw = v ? 14 : 28;
+          s.mem = svgEl('rect', { class: 'mem', x: hw - mw - 6, y: -hh + 6, width: mw, height: hh * 2 - 12, rx: 4 }, s.g);
+          s.memFill = svgEl('rect', { class: 'mem-fill', x: hw - mw - 6, y: hh - 6, width: mw, height: 0, rx: 4 }, s.g);
+          if (v) s.g.querySelectorAll('text').forEach(t => t.setAttribute('x', -8));
         }
         this.svcs.push(s);
       }
@@ -337,7 +339,7 @@
         if (o.cache === 'local') {
           const f = Math.min(1, this.caches[i].keys().length / Math.max(1, o.capacity)), h = (s.hh * 2 - 12) * f;
           s.memFill.setAttribute('y', s.hh - 6 - h); s.memFill.setAttribute('height', h);
-          s.sub.textContent = `caché ${this.caches[i].keys().length}/${o.capacity}`;
+          s.sub.textContent = `${this.v ? '' : 'caché '}${this.caches[i].keys().length}/${o.capacity}`;
         } else s.sub.textContent = o.cache ? 'busca en la caché' : 'consulta la DB';
       });
       if (this.front) this.front.sub.textContent = 'round robin';

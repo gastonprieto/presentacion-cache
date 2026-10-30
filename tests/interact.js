@@ -573,6 +573,23 @@ test('escena alescribir: falla desincroniza', async page => {
   check(r.bad.total < r.bad.trueTotal && r.bad.failures > 0, JSON.stringify(r.bad));
 });
 
+/* ---------- recorrido completo ---------- */
+
+test('escenas: stop/start sin errores', async (page, errors) => {
+  await open(page);
+  const n = await page.evaluate(() => document.querySelectorAll('.reveal .slides > section').length);
+  for (let i = 0; i < n; i++) {
+    await page.evaluate(i => Reveal.slide(i, 0, 99), i);
+    await sleep(250);
+  }
+  for (const i of [3, 14]) {
+    await page.evaluate(i => Reveal.slide(i, 0, 99), i);
+    await sleep(400);
+    check(await page.evaluate(i => !!window.__sec(i)._scene, i), `sin escena en ${i}`);
+  }
+  check(errors.length === 0, errors.join(' | '));
+});
+
 /* ---------- runner ---------- */
 
 (async () => {
