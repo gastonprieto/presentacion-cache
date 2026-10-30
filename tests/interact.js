@@ -377,10 +377,11 @@ test('escena fria: reiniciar causa errores y las mitigaciones los evitan', async
   const r = await evalScene(page, SL.fria, sec => {
     const run = () => {
       const sim = sec._scene.sim;
+      sec.querySelector('[data-act=reset]').click();
       sim.fastForward(8);
       sec.querySelector('[data-act=flush]').click();
-      sim.fastForward(4);
-      return sim.window(4).err;
+      sim.fastForward(6);
+      return sim.window(6).err;
     };
     const plain = run();
     sec.querySelector('input[data-opt=coalesce]').click();
